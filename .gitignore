@@ -1,0 +1,25 @@
+# Frontend dependencies and build outputs
+node_modules/
+frontend/dist/
+
+# Python virtual environments and caches
+backend/venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Editor and operating system temporary files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~

@@ -1,0 +1,73 @@
+{
+  "trained_at": "2026-10-16T18:59:29",
+  "n_units": 24,
+  "target": "avg_annual_cost",
+  "selected_feature_set": "repair rate + manufacturer",
+  "features": [
+    "manufacturer",
+    "repair_rate"
+  ],
+  "manufacturers": [
+    "Draeger V500",
+    "Getinge SERVOi"
+  ],
+  "repair_rate_cutoffs": {
+    "low_below": 1.0703812316715542,
+    "high_from": 1.3384918474738836
+  },
+  "fleet_repair_rates": [
+    0.81266,
+    0.855432,
+    0.983747,
+    0.984848,
+    0.991408,
+    1.026518,
+    1.026518,
+    1.060606,
+    1.075269,
+    1.075269,
+    1.212121,
+    1.212121,
+    1.212121,
+    1.240376,
+    1.287879,
+    1.32592,
+    1.363636,
+    1.439394,
+    1.466276,
+    1.515152,
+    1.742424,
+    1.818182,
+    2.045455,
+    2.272727
+  ],
+  "selected_mae": 149.07936925386443,
+  "cv_metrics_leave_one_out": {
+    "Baseline (always the fleet mean)": {
+      "MAE": 195.8397101449275,
+      "RMSE": 224.49462147724543,
+      "R2": -0.08884688090737214
+    },
+    "age + manufacturer": {
+      "MAE": 196.19410445480597,
+      "RMSE": 234.26270080166424,
+      "R2": -0.1856628768365085
+    },
+    "age + manufacturer + repair events": {
+      "MAE": 163.18354681345613,
+      "RMSE": 193.42213052547044,
+      "R2": 0.19170990698227097
+    },
+    "repair rate + manufacturer": {
+      "MAE": 149.07936925386443,
+      "RMSE": 186.91911527396994,
+      "R2": 0.24514703730807974
+    },
+    "age + repair rate + manufacturer": {
+      "MAE": 157.41502745491798,
+      "RMSE": 193.72385561144387,
+      "R2": 0.18918618732141446
+    }
+  },
+  "note": "Synthetic data. Maintenance-burden risk flag, not a failure probability."
+}

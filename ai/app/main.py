@@ -6,11 +6,11 @@ Run from the ai folder:
 
 Endpoints
   GET  /api/ai/health          service status (and whether the model is loaded)
-  POST /api/ai/predict         one unit  -> predicted annual cost, repair-burden risk, value view
+  POST /api/ai/predict         one unit  -> predicted annual cost, repair-intensity risk, value view
   POST /api/ai/fleet-summary   many units -> per-unit results plus fleet totals for the dashboard
 
 The model is trained by app/train.py on synthetic data. The risk level is a
-repair-burden indicator, NOT a failure probability.
+repair-intensity indicator, NOT a failure probability.
 """
 import json
 from bisect import bisect_right
@@ -62,7 +62,7 @@ class PredictionOut(BaseModel):
     cost_error_range: float          # typical error (cross-validated MAE), +/- dollars per year
     repair_rate_per_year: float
     risk_score: float                # 0-1: share of the training fleet with a repair rate at or below this unit
-    risk_level: str                  # low / medium / high repair burden
+    risk_level: str                  # low / medium / high repair intensity
     cumulative_cost_to_date: Optional[float]
     projected_cost_next_years: float
     projection_years: int
@@ -81,7 +81,7 @@ class FleetSummaryOut(BaseModel):
     average_predicted_annual_cost: float
     units_per_risk_level: dict
     cost_by_manufacturer: dict
-    highest_burden_units: List[PredictionOut]
+    most_repair_intensive_units: List[PredictionOut]
     predictions: List[PredictionOut]
 
 
@@ -169,6 +169,6 @@ def fleet_summary(fleet: FleetIn):
         average_predicted_annual_cost=round(total / len(preds), 2),
         units_per_risk_level=levels,
         cost_by_manufacturer=by_maker,
-        highest_burden_units=top,
+        most_repair_intensive_units=top,
         predictions=preds,
     )

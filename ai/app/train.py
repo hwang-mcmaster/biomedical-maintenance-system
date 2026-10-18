@@ -133,7 +133,7 @@ def main() -> None:
         "fleet_repair_rates": sorted(round(float(v), 6) for v in df["repair_rate"]),
         "selected_mae": results[best_name]["MAE"],
         "cv_metrics_leave_one_out": results,
-        "note": "Synthetic data. Maintenance-burden risk flag, not a failure probability.",
+        "note": "Synthetic data. Repair-intensity risk flag, not a failure probability.",
     }
     META_FILE.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"\nSaved model    -> {MODEL_FILE}")

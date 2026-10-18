@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-10-16T18:59:29",
+  "trained_at": "2026-10-18T15:44:49",
   "n_units": 24,
   "target": "avg_annual_cost",
   "selected_feature_set": "repair rate + manufacturer",
@@ -69,5 +69,5 @@
       "R2": 0.18918618732141446
     }
   },
-  "note": "Synthetic data. Maintenance-burden risk flag, not a failure probability."
+  "note": "Synthetic data. Repair-intensity risk flag, not a failure probability."
 }

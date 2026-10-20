@@ -4,24 +4,55 @@ A senior engineering project for biomedical equipment maintenance and replacemen
 
 ## What works now
 
-- Backend health status and message displayed in the browser.
-- A simple table of three hard-coded devices: Infusion Pump, Patient Monitor, and Defibrillator.
-- Independent loading and error messages for the two API requests.
+- React equipment form with required-field validation, saving state, and errors.
+- Database-backed GET /api/equipment and POST /api/equipment.
+- PostgreSQL generates IDs; the table refreshes after a successful save.
+- Status values: Operational, Under Maintenance, Inactive.
 
-The selected stack is **React + Vite, FastAPI, PostgreSQL, and Python AI**. Only React and FastAPI are implemented. PostgreSQL, AI recommendations, scheduling, authentication, technician management, and advanced UI are future work. Sample equipment is demonstration data, not a live inventory.
+## Week 4 database setup
+
+From backend/ in PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+Invoke-WebRequest https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -OutFile global-bundle.pem
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Edit backend/.env and enter DB_PASSWORD locally. Do not commit this file.
+DB_SSLROOTCERT comes from the environment; relative paths resolve from backend/.
+Connections always use sslmode=verify-full. The example contains the supplied RDS
+host, port, database and username; the password is deliberately blank.
+
+Have the database member inspect the existing equipment table before running
+`database/equipment.sql`. It creates a missing table and leaves an existing table
+unchanged. Existing tables must have id (generated integer), name, type, location,
+and status columns matching the API. Existing `Maintenance Due` values must be
+reviewed and mapped to the agreed statuses before use.
+
+With psql installed, from backend/ (password is prompted, never placed in a command):
+
+```powershell
+psql "host=biomedical-maintenance-db.c9o8kaiim0dv.ca-central-1.rds.amazonaws.com port=5432 dbname=biomedical_maintenance user=postgres sslmode=verify-full sslrootcert=./global-bundle.pem" -W -f ../database/equipment.sql
+```
+
+Allow your computer's public IP in the RDS security group on port 5432 and ensure
+RDS is reachable from your network. No database setup runs automatically on API startup.
 
 ## Folders
 
 ```text
 frontend/             React application (JavaScript), built with Vite
 backend/
-  app/main.py         FastAPI application and the two API routes
+  app/main.py         FastAPI application and API routes
+  app/database.py     Environment configuration and verified TLS connection
+  app/schemas.py      Request and response validation
   app/routes/         Placeholder for future route organization
   app/models/         Placeholder for future data models
   requirements.txt    Pinned Python dependencies
 ai/                   Future Python AI work; placeholder only
 scheduler/            Future scheduling work; placeholder only
-database/             Future PostgreSQL work; placeholder only
+database/             Equipment table SQL setup
 docs/                 Future project documentation; placeholder only
 ```
 
@@ -87,7 +118,9 @@ Backend base URL: http://localhost:8000. Interactive documentation: http://local
 | Method | Path | Result |
 | --- | --- | --- |
 | GET | /api/health | `{"status":"ok","message":"Biomedical Maintenance API is running"}` |
-| GET | /api/equipment | A JSON array of exactly three devices with id, name, type, location, and status |
+| GET | /api/equipment | Database records with id, name, type, location, and status |
+
+| POST | /api/equipment | Saves name/type/location/status; returns HTTP 201 and the record with generated ID |
 
 The frontend calls these endpoints directly. CORS permits the frontend origin `http://localhost:5173`.
 
@@ -100,7 +133,7 @@ Invoke-RestMethod http://localhost:8000/api/health
 Invoke-RestMethod http://localhost:8000/api/equipment
 ```
 
-Open the frontend and confirm the status says `ok` and the table has three rows. Stop the backend, then reload the page: clear error messages should replace the results.
+Open the frontend and confirm the status says `ok`. Add a device and check the generated ID and refreshed table. Reload to confirm persistence. Submit blank fields to check validation. A database failure returns HTTP 503; health reports only that the API process is running. Stop the backend, then reload the page: clear error messages should replace the results.
 
 From frontend/, check the code and production build:
 
@@ -118,3 +151,22 @@ npm.cmd run build
 - **Cannot import app.main:** run the backend start command from backend/, not the repository root.
 
 Reference documentation: [Vite](https://vite.dev/guide/) and [FastAPI CORS](https://fastapi.tiangolo.com/tutorial/cors/).
+
+## Automated Week 4 checks
+
+From the repository root:
+
+```powershell
+backend/venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+backend/venv/Scripts/python.exe -m unittest discover -s backend -p test_equipment.py
+npm.cmd --prefix frontend test
+npm.cmd --prefix frontend run lint
+npm.cmd --prefix frontend run build
+```
+
+API tests use a simulated database connection. The React DOM test uses simulated API
+responses to check blank fields, saving state, duplicate prevention, successful save,
+form reset, table refresh, and connection errors. These do not prove RDS persistence.
+For a live check, start both servers, add equipment, then reload and confirm it remains.
+A TCP timeout to RDS requires checking its security group, public accessibility or VPN,
+and network routing before database authentication can be verified.

@@ -23,3 +23,15 @@ button { padding: 10px 20px; background: #245a75; color: white; border: 0; borde
 fieldset:disabled { opacity: .65; }
 button:disabled, fieldset:disabled button { cursor: wait; }
 [aria-invalid="true"] { border-color: #9d2525; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.actions, .section-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.section-heading { justify-content: space-between; margin-bottom: 16px; }
+.section-heading h2 { margin: 0; }
+.secondary { background: #edf3f7; color: #245a75; border: 1px solid #8799ad; }
+button:disabled { opacity: .65; cursor: wait; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #35667e; outline-offset: 3px; }
+.details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+dt { font-weight: 650; color: #42546a; }
+dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.assessment { margin-top: 20px; padding: 16px; background: #f3f6fa; border-radius: 6px; }
+@media (max-width: 600px) { .form-grid, .details-grid { grid-template-columns: 1fr; } }

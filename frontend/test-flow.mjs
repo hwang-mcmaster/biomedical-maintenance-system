@@ -1,51 +1,109 @@
 import { JSDOM } from 'jsdom'
 import { readFileSync, readdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
+
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost:5173', runScripts: 'outside-only' })
 const w = dom.window
-let records = [], posts = 0, releaseSave
+const id = '49e7403c-a464-44be-bc4c-c1741b53ec11'
+let records = [], posts = 0, releaseSave, assessmentCalls = 0
+let failList = false, failAssessment = false
+const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
 w.fetch = async (url, options = {}) => {
+  const path = new URL(url).pathname
+  if (path.endsWith('/assessment')) {
+    assessmentCalls++
+    if (failAssessment) return response({ detail: 'Assessment service unavailable. Retry later.' }, 503)
+    return response({ equipment_id: id, assessed_at: '2026-10-20T12:00:00Z', method: 'AI model',
+      recommendation: 'Review repair history with the engineering team.', limitation: 'Synthetic data; not failure probability.',
+      prediction: { risk_level: 'medium', repair_rate_per_year: 1.2, predicted_annual_cost: 600,
+        cost_error_range: 149.08, projected_cost_next_years: 3000, projection_years: 5,
+        warnings: ['Manufacturer not in training data.'] } })
+  }
   if (options.method === 'POST') {
     posts++
     const payload = JSON.parse(options.body)
+    if (records.some((r) => r.asset_tag === payload.asset_tag)) return response({ detail: 'Asset tag or serial number already exists. Use unique values.' }, 409)
     await new Promise(resolve => { releaseSave = resolve })
-    const record = { ...payload, id: 7 }; records.push(record)
-    return { ok: true, json: async () => record }
+    const record = { ...payload, id }; records.push(record)
+    return response(record, 201)
   }
-  return { ok: true, json: async () => url.endsWith('/health') ? { status: 'ok', message: 'Ready' } : [...records] }
+  if (options.method === 'PUT') {
+    records = [{ ...JSON.parse(options.body), id }]
+    return response(records[0])
+  }
+  if (options.method === 'DELETE') { records = []; return response(null, 204) }
+  if (path.endsWith('/health')) return response({ status: 'ok', message: 'API ready' })
+  if (path.endsWith('/ready')) return response({ status: 'ok', message: 'Database ready' })
+  return failList ? response({ detail: 'Database unavailable.' }, 503) : response([...records])
 }
 const bundle = readdirSync('dist/assets').find(name => name.endsWith('.js'))
 w.eval(readFileSync(`dist/assets/${bundle}`, 'utf8'))
-const wait = () => new Promise(resolve => setTimeout(resolve, 80))
-await wait()
-let form = w.document.querySelector('form')
-const submit = () => form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
-submit(); await wait()
-assert.equal(posts, 0)
-assert.match(w.document.body.textContent, /This field is required/)
-for (const [id, value] of Object.entries({ name: 'Pump', type: 'Infusion', location: 'ICU' })) {
-  const input = w.document.getElementById(id)
-  Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value').set.call(input, value)
-  input.dispatchEvent(new w.Event('input', { bubbles: true }))
+const wait = () => new Promise(resolve => setTimeout(resolve, 50))
+async function until(check, label) {
+  for (let i = 0; i < 60; i++) { if (check()) return; await wait() }
+  throw new Error(`Timed out: ${label}`)
+}
+const text = () => w.document.body.textContent
+const button = (label) => [...w.document.querySelectorAll('button')].find(b => b.textContent === label)
+async function setInput(key, value) {
+  const input = w.document.getElementById(key)
+  const prototype = input.tagName === 'SELECT' ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype
+  Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, value)
+  input.dispatchEvent(new w.Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
   await wait()
 }
-submit(); await wait()
-assert.equal(posts, 1)
+const submit = () => w.document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
+const values = { name: 'SERVOi', type: 'Ventilator', location: 'ICU', asset_tag: 'TEST-1',
+  serial_number: 'SN-1', manufacturer: 'Getinge SERVOi', firmware_version: '1.0', in_service_date: '2020-01-01' }
+await until(() => text().includes('No equipment found'), 'initial inventory')
+submit(); await wait(); assert.equal(posts, 0); assert.match(text(), /This field is required/)
+for (const [key, value] of Object.entries(values)) await setInput(key, value)
+submit(); await until(() => posts === 1, 'POST')
 assert.equal(w.document.querySelector('fieldset').disabled, true)
 submit(); await wait(); assert.equal(posts, 1)
-releaseSave(); await wait(); await wait()
-assert.match(w.document.body.textContent, /Equipment saved \(ID 7\)/)
+releaseSave()
+await until(() => w.document.querySelector('tbody'), 'table refresh')
+assert.match(text(), /Equipment saved/)
 assert.equal(w.document.getElementById('name').value, '')
-assert.match(w.document.querySelector('tbody').textContent, /Pump/)
 assert.equal(w.document.querySelector('fieldset').disabled, false)
+button('Details & assessment').click(); await wait()
+button('Assess equipment').click()
+await until(() => text().includes('Repair intensity: medium'), 'assessment')
+assert.equal(assessmentCalls, 1)
+assert.match(text(), /600\.00/)
+assert.match(text(), /Manufacturer not in training data/)
+assert.match(text(), /not failure probability/)
+failAssessment = true
+button('Assess equipment').click()
+await until(() => text().includes('Assessment service unavailable'), 'assessment error')
+assert.doesNotMatch(text(), /Repair intensity: medium/)
+failAssessment = false
+button('Assess equipment').click()
+await until(() => text().includes('Repair intensity: medium'), 'assessment retry')
+button('Edit').click(); await wait()
+assert.equal(w.document.getElementById('asset_tag').value, 'TEST-1')
+await setInput('location', 'Test lab')
+await setInput('repair_events', '12')
+submit(); await until(() => text().includes('Equipment updated'), 'update')
+await until(() => w.document.querySelector('tbody').textContent.includes('Test lab'), 'updated table')
+assert.equal(records[0].repair_events, 12)
+assert.doesNotMatch(text(), /Repair intensity: medium/)
+for (const [key, value] of Object.entries(values)) await setInput(key, value)
+submit(); await until(() => text().includes('already exists'), 'duplicate conflict')
+assert.equal(w.document.getElementById('name').value, 'SERVOi')
+failList = true
+button('Refresh table').click()
+await until(() => text().includes('Unable to refresh equipment'), 'refresh failure')
+assert.match(w.document.querySelector('tbody').textContent, /TEST-1/)
+failList = false
+button('Refresh table').click()
+await until(() => !text().includes('Unable to refresh equipment') && !button('Refresh table').disabled, 'refresh retry')
+button('Delete').click(); await wait()
+button('Cancel').click(); await wait(); assert.equal(records.length, 1)
+button('Delete').click(); await wait(); button('Confirm delete').click()
+await until(() => text().includes('No equipment found'), 'delete and refresh')
+assert.equal(records.length, 0)
 w.fetch = async () => { throw new w.TypeError('Failed to fetch') }
-for (const id of ['name','type','location']) {
-  const input = w.document.getElementById(id)
-  Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value').set.call(input, 'test')
-  input.dispatchEvent(new w.Event('input', { bubbles: true })); await wait()
-}
-submit(); await wait()
-assert.match(w.document.body.textContent, /Cannot reach the backend/)
-console.log('Frontend DOM flow passed: required validation, POST, duplicate prevention, saving state, reset, table refresh, network error.')
+submit(); await until(() => text().includes('Cannot reach the service'), 'connection error')
+console.log('Frontend flow passed: required validation, save/refresh, duplicate prevention, AI results/warnings/retry, edit, duplicate conflict, refresh failure/retry, delete confirmation, and connection errors.')
 dom.window.close()
-

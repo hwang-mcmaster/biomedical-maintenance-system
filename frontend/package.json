@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node test-flow.mjs"
+    "test": "npm run build && node test-flow.mjs",
+    "test:live": "npm run build && node test-live.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

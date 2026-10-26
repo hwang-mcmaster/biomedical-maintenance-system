@@ -3,35 +3,48 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, computed_field
+
+from .calculations import reference_date, exact_age, two_places, annual_average
 
 Text100 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 Text50 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
 Money = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
 
 
-class EquipmentCreate(BaseModel):
+class EquipmentData(BaseModel):
     model_config = ConfigDict(extra='forbid')
     asset_tag: Text50
     serial_number: Text100
     manufacturer: Text100
     in_service_date: date
-    # Dataset snapshots: preserve supplied values, do not derive them from today's date.
-    age_years: Annotated[Decimal, Field(ge=0, max_digits=8, decimal_places=3)]
-    repair_events: Annotated[int, Field(strict=True, ge=0, le=2147483647)]
-    total_historical_cost: Money
-    avg_annual_cost: Money
+    repair_events: Annotated[int, Field(strict=True, ge=0, le=2147483647)] = 0
+    total_historical_cost: Money = Decimal('0.00')
 
+
+class EquipmentCreate(EquipmentData):
     @field_validator('in_service_date')
     @classmethod
-    def not_in_future(cls, value):
-        if value > date.today():
-            raise ValueError('In-service date cannot be in the future.')
+    def before_today(cls, value):
+        if value >= reference_date():
+            raise ValueError('In-service date must be before today.')
         return value
 
 
-class Equipment(EquipmentCreate):
+class Equipment(EquipmentData):
     id: UUID
+    calculated_as_of: date = Field(default_factory=reference_date)
+
+    @computed_field
+    @property
+    def age_years(self) -> Decimal:
+        return two_places(exact_age(self.in_service_date, self.calculated_as_of))
+
+    @computed_field
+    @property
+    def avg_annual_cost(self) -> Decimal | None:
+        age = exact_age(self.in_service_date, self.calculated_as_of)
+        return annual_average(self.total_historical_cost, age)
 
 
 class Prediction(BaseModel):

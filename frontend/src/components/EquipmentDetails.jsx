@@ -27,6 +27,7 @@ export default function EquipmentDetails({ device, onClose }) {
       <dl className="details-grid">
         {equipmentFields.map(({ key, label }) => <div key={key}><dt>{label}</dt><dd>{displayValue(key, device[key])}</dd></div>)}
       </dl>
+      <p className="subtitle">Age and historical annual average calculated as of {device.calculated_as_of}. Amounts are in CAD.</p>
       <h3>AI-assisted maintenance review</h3>
       <p className="subtitle">Prototype trained on synthetic ventilator data. Repair intensity is not failure probability or a clinical safety assessment.</p>
       <p className="subtitle">This dataset does not specify device type. Confirm that the item belongs to the ventilator fleet before interpreting the model output.</p>

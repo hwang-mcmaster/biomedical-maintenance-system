@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { request } from '../api'
+import { request, API_URL } from '../api'
 import { equipmentFields, displayValue } from '../equipmentFields'
 
 export default function EquipmentTable({ devices, loading, error, onRefresh, onDetails, onEdit, onDeleted }) {
@@ -24,7 +24,8 @@ export default function EquipmentTable({ devices, loading, error, onRefresh, onD
   return (
     <section className="panel" aria-labelledby="equipment-heading">
       <div className="section-heading"><h2 id="equipment-heading">Equipment</h2>
-        <button type="button" className="secondary" disabled={loading} onClick={onRefresh}>Refresh table</button></div>
+        <div className="actions"><a className="button-link secondary" href={`${API_URL}/api/equipment/export`}>Export training CSV</a>
+        <button type="button" className="secondary" disabled={loading} onClick={onRefresh}>Refresh table</button></div></div>
       <div role="status" aria-live="polite">
         {loading && <p>Loading equipment…</p>}
         {error && <p className="error">Unable to refresh equipment. {error} Any displayed rows are from the last successful load.</p>}

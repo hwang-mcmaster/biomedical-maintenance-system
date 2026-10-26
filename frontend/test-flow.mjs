@@ -8,6 +8,11 @@ const id = '49e7403c-a464-44be-bc4c-c1741b53ec11'
 let records = [], posts = 0, releaseSave, assessmentCalls = 0
 let failList = false, failAssessment = false
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
+const asOf = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+const calculated = (record) => {
+  const age = Math.max(0, (Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${record.in_service_date}T00:00:00Z`)) / 86400000) / 365.25
+  return { ...record, calculated_as_of: asOf, age_years: age.toFixed(2), avg_annual_cost: age > 0 ? (Number(record.total_historical_cost) / age).toFixed(2) : null }
+}
 w.fetch = async (url, options = {}) => {
   const path = new URL(url).pathname
   if (path.endsWith('/assessment')) {
@@ -27,16 +32,19 @@ w.fetch = async (url, options = {}) => {
     if (records.some((r) => r.asset_tag === payload.asset_tag)) return response({ detail: 'Asset tag or serial number already exists. Use unique values.' }, 409)
     await new Promise(resolve => { releaseSave = resolve })
     const record = { ...payload, id }; records.push(record)
-    return response(record, 201)
+    assert.equal(Object.keys(payload).length, 6)
+    assert.equal('age_years' in payload, false)
+    assert.equal('avg_annual_cost' in payload, false)
+    return response(calculated(record), 201)
   }
   if (options.method === 'PUT') {
     records = [{ ...JSON.parse(options.body), id }]
-    return response(records[0])
+    return response(calculated(records[0]))
   }
   if (options.method === 'DELETE') { records = []; return response(null, 204) }
   if (path.endsWith('/health')) return response({ status: 'ok', message: 'API ready' })
   if (path.endsWith('/ready')) return response({ status: 'ok', message: 'Database ready' })
-  return failList ? response({ detail: 'Database unavailable.' }, 503) : response([...records])
+  return failList ? response({ detail: 'Database unavailable.' }, 503) : response(records.map(calculated))
 }
 const bundle = readdirSync('dist/assets').find(name => name.endsWith('.js'))
 w.eval(readFileSync(`dist/assets/${bundle}`, 'utf8'))
@@ -56,22 +64,25 @@ async function setInput(key, value) {
 }
 const submit = () => w.document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
 const values = { asset_tag: 'TEST-1', serial_number: '0000123', manufacturer: 'Getinge SERVOi',
-  in_service_date: '2003-03-03', age_years: '23.38', repair_events: '19',
-  total_historical_cost: '9678.12', avg_annual_cost: '413.95' }
+  in_service_date: '2003-03-03', repair_events: '19', total_historical_cost: '9678.12' }
 await until(() => text().includes('No equipment found'), 'initial inventory')
-assert.equal(w.document.querySelectorAll('form input').length, 8)
+assert.equal(w.document.querySelectorAll('form input').length, 6)
 assert.equal(w.document.querySelectorAll('form select').length, 0)
 for (const key of ['name', 'type', 'location', 'status', 'firmware_version', 'assumed_replacement_cost']) assert.equal(w.document.getElementById(key), null)
 submit(); await wait(); assert.equal(posts, 0); assert.match(text(), /This field is required/)
 for (const [key, value] of Object.entries(values)) await setInput(key, value)
-await setInput('avg_annual_cost', '')
+assert.equal(w.document.querySelectorAll('form output').length, 2)
+assert.equal(w.document.getElementById('age_years').tagName, 'OUTPUT')
+assert.equal(w.document.getElementById('avg_annual_cost').tagName, 'OUTPUT')
+assert.equal(w.document.getElementById('avg_annual_cost').textContent, Number(calculated(values).avg_annual_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+await setInput('total_historical_cost', '-1')
 submit(); await wait(); assert.equal(posts, 0)
-assert.equal(w.document.getElementById('avg_annual_cost-error').textContent, 'This field is required.')
-await setInput('avg_annual_cost', '413.95')
-await setInput('age_years', '-1')
+assert.match(w.document.getElementById('total_historical_cost-error').textContent, /non-negative/)
+await setInput('total_historical_cost', '9678.12')
+await setInput('in_service_date', asOf)
 submit(); await wait(); assert.equal(posts, 0)
-assert.match(w.document.getElementById('age_years-error').textContent, /non-negative/)
-await setInput('age_years', '23.38')
+assert.match(w.document.getElementById('in_service_date-error').textContent, /before today/)
+await setInput('in_service_date', '2003-03-03')
 submit(); await until(() => posts === 1, 'POST')
 assert.equal(w.document.querySelector('fieldset').disabled, true)
 submit(); await wait(); assert.equal(posts, 1)
@@ -80,8 +91,10 @@ await until(() => w.document.querySelector('tbody'), 'table refresh')
 assert.match(text(), /Equipment saved/)
 assert.equal(w.document.getElementById('asset_tag').value, '')
 assert.match(w.document.querySelector('tbody').textContent, /0000123/)
-assert.match(w.document.querySelector('tbody').textContent, /413\.95/)
-assert.equal(records[0].age_years, '23.38')
+assert.equal(w.document.querySelector('td[data-field=age_years]').textContent, calculated(values).age_years)
+assert.equal(records[0].age_years, undefined)
+assert.equal(w.document.getElementById('repair_events').value, '0')
+assert.equal(w.document.getElementById('total_historical_cost').value, '0')
 assert.equal(w.document.querySelector('fieldset').disabled, false)
 button('Details & assessment').click(); await wait()
 button('Assess equipment').click()
@@ -101,7 +114,10 @@ button('Assess equipment').click()
 await until(() => text().includes('Repair intensity: medium'), 'assessment retry')
 button('Edit').click(); await wait()
 assert.equal(w.document.getElementById('asset_tag').value, 'TEST-1')
-await setInput('avg_annual_cost', '321.09')
+const oldAgePreview = w.document.getElementById('age_years').textContent
+await setInput('in_service_date', '2000-01-01')
+assert.notEqual(w.document.getElementById('age_years').textContent, oldAgePreview)
+await setInput('total_historical_cost', '321.09')
 await setInput('repair_events', '12')
 submit(); await until(() => text().includes('Equipment updated'), 'update')
 await until(() => w.document.querySelector('tbody').textContent.includes('321.09'), 'updated table')

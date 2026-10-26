@@ -1,3 +1,5 @@
+import csv
+import io
 import logging
 from uuid import UUID
 
@@ -8,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import repository
 from .assessment import assess_equipment
 from .database import get_connection
+from .calculations import reference_date
 from .schemas import Assessment, Equipment, EquipmentCreate
 
 logger = logging.getLogger(__name__)
@@ -54,6 +57,24 @@ def ready():
 @app.get('/api/equipment', response_model=list[Equipment])
 def equipment():
     return repository.list_equipment()
+
+
+@app.get('/api/equipment/export')
+def export_equipment():
+    # One reference date for the whole export; derived values are frozen in CSV.
+    as_of = reference_date()
+    fields = ['asset_tag', 'serial_number', 'manufacturer', 'in_service_date',
+              'age_years', 'repair_events', 'total_historical_cost', 'avg_annual_cost']
+    output = io.StringIO(newline='')
+    writer = csv.DictWriter(output, fieldnames=fields)
+    writer.writeheader()
+    for row in repository.list_equipment():
+        record = Equipment.model_validate({**row, 'calculated_as_of': as_of})
+        writer.writerow(record.model_dump(include=set(fields)))
+    return Response(output.getvalue(), media_type='text/csv', headers={
+        'Content-Disposition': f'attachment; filename="equipment-training-{as_of}.csv"',
+        'X-Calculated-As-Of': as_of.isoformat(), 'Cache-Control': 'no-store',
+    })
 
 
 @app.get('/api/equipment/{equipment_id}', response_model=Equipment)

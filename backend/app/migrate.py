@@ -3,13 +3,13 @@ from pathlib import Path
 import psycopg
 from .database import get_connection
 
-MIGRATION = Path(__file__).resolve().parents[2] / 'database/migrations/001_eight_field_dataset.sql'
+MIGRATION = Path(__file__).resolve().parents[2] / 'database/migrations/002_calculated_metrics.sql'
 
 
 def migrate():
     with get_connection() as connection:
         connection.execute(MIGRATION.read_text(encoding='utf-8'), prepare=False)
-    print('Eight-field dataset migration committed. Existing records and legacy columns preserved.')
+    print('Calculated-metrics migration committed. Source records and old snapshots preserved.')
 
 
 if __name__ == '__main__':

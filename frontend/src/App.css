@@ -35,3 +35,6 @@ dt { font-weight: 650; color: #42546a; }
 dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .assessment { margin-top: 20px; padding: 16px; background: #f3f6fa; border-radius: 6px; }
 @media (max-width: 600px) { .form-grid, .details-grid { grid-template-columns: 1fr; } }
+
+output { display: block; box-sizing: border-box; width: 100%; max-width: 480px; padding: 10px; border: 1px solid #b5c3d1; border-radius: 5px; background: #f3f6fa; }
+.button-link { display: inline-block; padding: 10px 20px; border-radius: 5px; text-decoration: none; }

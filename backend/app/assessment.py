@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from .schemas import Assessment, Prediction
+from .calculations import exact_age
 
 LIMITATION = ('Prototype trained on synthetic ventilator data. Risk means relative repair intensity, '
               'not failure probability or clinical safety. Recommendations require engineering review.')
@@ -18,11 +19,12 @@ RECOMMENDATIONS = {
 
 
 def assess_equipment(device):
-    if device.age_years <= 0:
-        raise HTTPException(422, 'Assessment requires a supplied age greater than zero.')
+    age = exact_age(device.in_service_date, device.calculated_as_of)
+    if age <= 0:
+        raise HTTPException(422, 'Assessment requires a positive elapsed age. Check the in-service date.')
     payload = {
         'asset_tag': device.asset_tag, 'manufacturer': device.manufacturer,
-        'age_years': float(device.age_years), 'repair_events': device.repair_events,
+        'age_years': float(age), 'repair_events': device.repair_events,
         'cumulative_cost_to_date': float(device.total_historical_cost),
         'projection_years': 5,
     }

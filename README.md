@@ -149,6 +149,16 @@ input returns 422, absent equipment returns 404, and unavailable database or AI
 service returns 503. Database exception categories are logged without raw secrets.
 Delete returns 409 if other records reference the equipment.
 
+### AI service API
+
+The AI service runs separately on port 8001. Interactive API documentation: http://localhost:8001/docs.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| GET | /api/ai/health | Service status, and whether the model is loaded |
+| POST | /api/ai/predict | One unit in; predicted annual cost, repair-intensity risk, and value view |
+| POST | /api/ai/fleet-summary | Many units in; per-unit results plus fleet totals for the dashboard |
+
 ## How assessment works
 
 1. Load saved equipment from PostgreSQL using its UUID.

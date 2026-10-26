@@ -12,19 +12,15 @@ Money = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
 
 class EquipmentCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    # Keep the original frontend names; map them to the team's DB columns in repository.py.
-    name: Text100  # model_number
-    type: Text100  # device_type
-    location: Text100  # department
-    status: Literal['Operational', 'Under Maintenance', 'Inactive']
     asset_tag: Text50
     serial_number: Text100
     manufacturer: Text100
-    firmware_version: Text50
     in_service_date: date
-    repair_events: Annotated[int, Field(strict=True, ge=0, le=2147483647)] = 0
-    total_historical_cost: Money = Decimal('0.00')
-    assumed_replacement_cost: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)] | None = None
+    # Dataset snapshots: preserve supplied values, do not derive them from today's date.
+    age_years: Annotated[Decimal, Field(ge=0, max_digits=8, decimal_places=3)]
+    repair_events: Annotated[int, Field(strict=True, ge=0, le=2147483647)]
+    total_historical_cost: Money
+    avg_annual_cost: Money
 
     @field_validator('in_service_date')
     @classmethod
@@ -55,6 +51,8 @@ class Prediction(BaseModel):
 
 class Assessment(BaseModel):
     equipment_id: UUID
+    risk_score: Annotated[float, Field(ge=0, le=1, allow_inf_nan=False, description='Relative repair-intensity percentile from 0 to 1; not failure probability.')]
+    risk_level: Literal['low', 'medium', 'high']
     assessed_at: datetime
     method: str
     recommendation: str

@@ -84,7 +84,10 @@ def remove_equipment(equipment_id: UUID):
     return Response(status_code=204)
 
 
-@app.post('/api/equipment/{equipment_id}/assessment', response_model=Assessment)
-def equipment_assessment(equipment_id: UUID):
+@app.get('/api/equipment/{equipment_id}/assessment', response_model=Assessment)
+@app.post('/api/equipment/{equipment_id}/assessment', response_model=Assessment, deprecated=True)
+def equipment_assessment(equipment_id: UUID, response: Response):
+    # Assessments depend on the latest saved history; do not cache old results.
+    response.headers['Cache-Control'] = 'no-store'
     device = Equipment.model_validate(equipment_details(equipment_id))
     return assess_equipment(device)

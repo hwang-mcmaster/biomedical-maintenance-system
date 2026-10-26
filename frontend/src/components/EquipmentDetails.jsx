@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { request } from '../api'
+import { equipmentFields, displayValue } from '../equipmentFields'
 
 const amount = (value) => Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -14,33 +15,29 @@ export default function EquipmentDetails({ device, onClose }) {
     setLoading(true)
     setError('')
     setAssessment(null)
-    try { setAssessment(await request(`/api/equipment/${device.id}/assessment`, { method: 'POST' })) }
+    try { setAssessment(await request(`/api/equipment/${device.id}/assessment`, { method: 'GET', cache: 'no-store' })) }
     catch (failure) { setError(failure.message) }
     finally { pending.current = false; setLoading(false) }
   }
   const prediction = assessment?.prediction
-  const supported = device.type.toLowerCase().includes('ventilator')
   return (
     <section className="panel" aria-labelledby="details-heading">
       <div className="section-heading"><h2 id="details-heading">Equipment details: {device.asset_tag}</h2>
         <button type="button" className="secondary" onClick={onClose}>Close details</button></div>
       <dl className="details-grid">
-        {Object.entries({ ID: device.id, 'Name / model': device.name, Manufacturer: device.manufacturer,
-          'Serial number': device.serial_number, Firmware: device.firmware_version,
-          'In service': device.in_service_date, 'Repair events': device.repair_events,
-          'Historical cost ($)': amount(device.total_historical_cost),
-          'Replacement cost ($)': device.assumed_replacement_cost == null ? 'Not provided' : amount(device.assumed_replacement_cost),
-        }).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        {equipmentFields.map(({ key, label }) => <div key={key}><dt>{label}</dt><dd>{displayValue(key, device[key])}</dd></div>)}
       </dl>
       <h3>AI-assisted maintenance review</h3>
       <p className="subtitle">Prototype trained on synthetic ventilator data. Repair intensity is not failure probability or a clinical safety assessment.</p>
-      {!supported && <p>This model supports ventilators only. Assessment is unavailable for this equipment type.</p>}
-      <button type="button" disabled={loading || !supported} onClick={assess}>{loading ? 'Assessing…' : 'Assess equipment'}</button>
+      <p className="subtitle">This dataset does not specify device type. Confirm that the item belongs to the ventilator fleet before interpreting the model output.</p>
+      <button type="button" disabled={loading} onClick={assess}>{loading ? 'Assessing…' : 'Assess equipment'}</button>
       {error && <p role="alert" className="error">{error}</p>}
       {assessment && <div className="assessment" role="status" aria-live="polite">
-        <p><strong>Repair intensity: {prediction.risk_level}</strong></p>
+        <p><strong>Repair intensity: {assessment.risk_level}</strong></p>
         <p>{assessment.recommendation}</p>
         <dl className="details-grid">
+          <div><dt>Risk score (relative repair intensity, 0 to 1)</dt><dd>{assessment.risk_score.toFixed(3)}</dd></div>
+          <div><dt>Score meaning</dt><dd>Share of the training fleet with an equal or lower repair rate; not the chance of failure.</dd></div>
           <div><dt>Predicted annual maintenance cost</dt><dd>${amount(prediction.predicted_annual_cost)}</dd></div>
           <div><dt>Typical validation error (MAE)</dt><dd>${amount(prediction.cost_error_range)} / year (not a confidence interval)</dd></div>
           <div><dt>Repair events / year</dt><dd>{prediction.repair_rate_per_year}</dd></div>

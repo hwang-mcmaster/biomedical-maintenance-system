@@ -14,32 +14,59 @@ existing AI maintenance-cost service.
   intensity, annual/projected maintenance cost, validation error, recommendation,
   and model warnings. Results are calculated on demand, not stored.
 
-## Database contract
+## Agreed eight-field dataset
 
-The backend now matches the team's existing RDS equipment table. The previous
-starter expected integer `id`, `name`, `type`, `location`, and `status` columns,
-which do not exist in the actual RDS table. `app/repository.py` maps the API names:
+The form, table, API, and PostgreSQL storage share exactly these data fields:
 
-| API field | RDS column |
-| --- | --- |
-| id | equipment_id (UUID) |
-| name | model_number |
-| type | device_type |
-| location | department |
-| status | operating_status |
+| Display column | API / database column | Rule |
+| --- | --- | --- |
+| Asset Tag | asset_tag | Required text, max 50, unique |
+| Serial No. | serial_number | Required text, max 100, unique; leading zeros preserved |
+| Manufacturer | manufacturer | Required text, max 100 |
+| In-Service Date | in_service_date | Required date, not in the future |
+| Age (years) | age_years | Required non-negative decimal, up to 3 decimal places |
+| Repair Events (n) | repair_events | Required integer from 0 to 2147483647 |
+| Total Historical Cost ($) | total_historical_cost | Required non-negative amount, up to 2 decimal places |
+| Avg. Annual Cost ($) | avg_annual_cost | Required non-negative amount, up to 2 decimal places |
 
-API statuses are `Operational`, `Under Maintenance`, and `Inactive`; DB values are
-`operational`, `under_maintenance`, and `inactive`.
+PostgreSQL also generates an internal UUID (`equipment_id`, exposed as `id`) and
+maintains created/updated timestamps. These are not user-entered dataset fields.
+Responses serialize exact decimal values as strings. Repair counts remain integers.
 
-Creation and full updates also require `asset_tag`, `serial_number`, `manufacturer`,
-`firmware_version`, and `in_service_date`. These fields are required by the existing
-RDS schema. Repair events and historical cost default to zero; replacement cost
-is optional. Unknown historical costs or repair counts should be verified before
-using assessment. No equipment values or dates are fabricated by the backend.
+Age and average annual cost are authoritative dataset snapshots. They are stored
+as supplied, not recalculated from today's date or forced to match a cost/age
+formula. Missing values are rejected; zero must be explicitly supplied. Agree the
+reporting date and cost definitions in dataset documentation outside the eight
+columns. Historical average annual cost and AI-estimated annual cost are separate
+values in the interface.
 
-`database/equipment.sql` creates the matching table on a fresh PostgreSQL database.
-It leaves an existing table untouched. This implementation did not change the
-shared RDS schema or the teammate's model files.
+Name/model, equipment type, department, status, firmware, and replacement cost
+are no longer inputs or outputs of equipment CRUD. Existing legacy database
+columns and their values are retained for compatibility but are not used by the
+application. No fake values are written into them.
+
+### Existing RDS database migration
+
+From backend/ after configuration:
+
+```powershell
+.\venv\Scripts\python.exe -m app.migrate
+```
+
+This explicitly applies `database/migrations/001_eight_field_dataset.sql` in one
+transaction. It adds required `age_years` and `avg_annual_cost`, makes old required
+fields optional, removes automatic defaults for repair count/historical cost, and
+adds non-negative/nonblank checks. It never drops columns or records and can be
+rerun. Migration does not run automatically when the API starts.
+
+If legacy records lack age or annual cost, migration aborts and rolls back. Supply
+verified source values through a reviewed backfill before retrying. Do not derive
+unknown historical values from today's date just to pass migration. The RDS table
+was empty when this migration was applied during implementation.
+
+For a fresh database, `database/equipment.sql` creates only the active eight-field
+schema plus internal UUID/timestamps. Existing tables need the migration too;
+`CREATE TABLE IF NOT EXISTS` alone does not update them.
 
 ## Setup (Windows PowerShell)
 
@@ -106,8 +133,9 @@ From backend/ with psql installed (password is prompted):
 psql "host=biomedical-maintenance-db.c9o8kaiim0dv.ca-central-1.rds.amazonaws.com port=5432 dbname=biomedical_maintenance user=postgres sslmode=verify-full sslrootcert=./global-bundle.pem" -W -f ../database/equipment.sql
 ```
 
-For an existing database, inspect its schema first. An old integer-ID starter
-schema needs a planned migration; this application targets the UUID RDS schema.
+For an existing database, run the migration above instead of dropping/recreating
+the table. The previous integer-ID starter schema needs a separately planned
+migration; the active schema uses database-generated UUIDs.
 
 ## API
 
@@ -122,32 +150,34 @@ Interactive API documentation: http://localhost:8000/docs.
 | POST | /api/equipment | Creates equipment; returns 201 with generated UUID |
 | PUT | /api/equipment/{uuid} | Full replacement of editable fields; returns updated record |
 | DELETE | /api/equipment/{uuid} | Deletes record; returns 204 |
-| POST | /api/equipment/{uuid}/assessment | Uses stored equipment data and the existing AI model |
+| GET | /api/equipment/{uuid}/assessment | Returns equipment_id, risk_score (0 to 1), risk_level, recommendation, and detailed AI prediction |
 
-Example creation body:
+Example creation body (exactly eight fields):
 
 ```json
 {
-  "name": "SERVOi",
-  "type": "Ventilator",
-  "location": "ICU",
-  "status": "Operational",
   "asset_tag": "CED-DEMO-001",
-  "serial_number": "DEMO-SN-001",
+  "serial_number": "006412",
   "manufacturer": "Getinge SERVOi",
-  "firmware_version": "1.0",
-  "in_service_date": "2020-01-01",
-  "repair_events": 10,
-  "total_historical_cost": 1000,
-  "assumed_replacement_cost": 20000
+  "in_service_date": "2003-03-03",
+  "age_years": "23.380",
+  "repair_events": 19,
+  "total_historical_cost": "9678.12",
+  "avg_annual_cost": "413.95"
 }
 ```
 
-Use the device's real identifiers, model family, firmware, and history. The sample
-is for a demo only. Duplicate asset tags or serial numbers return 409. Invalid
-input returns 422, absent equipment returns 404, and unavailable database or AI
-service returns 503. Database exception categories are logged without raw secrets.
-Delete returns 409 if other records reference the equipment.
+Use source identifiers, manufacturer labels and lifecycle history. The sample is
+for a demo only. Duplicate asset tags/serial numbers return 409. Invalid or missing
+fields return 422, absent equipment returns 404, and unavailable database or AI
+service returns 503. Zero age is valid equipment data but cannot be assessed because
+repair rate divides by age. Unexpected fields, including the old name/type/status
+properties, are rejected. A full PUT requires all eight fields.
+
+The former POST assessment route remains a deprecated compatibility alias. The
+frontend uses GET with caching disabled. The top-level risk_score is a relative
+repair-intensity percentile, not failure probability; prediction retains the
+same score for compatibility. Assessment results are not saved to the equipment table.
 
 ### AI service API
 
@@ -161,27 +191,33 @@ The AI service runs separately on port 8001. Interactive API documentation: http
 
 ## How assessment works
 
-1. Load saved equipment from PostgreSQL using its UUID.
-2. Require a ventilator and an in-service date before today.
-3. Derive age from the in-service date; use saved manufacturer, repair events,
-   historical cost, and optional replacement cost.
-4. Call the existing `POST /api/ai/predict` endpoint with a five-year horizon.
-5. Return its prediction plus a deterministic engineering-review recommendation
-   based on the low/medium/high repair-intensity band.
+1. Load the eight-field equipment record from PostgreSQL using its UUID.
+2. Require a supplied age greater than zero.
+3. Send the saved age, manufacturer, repair count and historical total cost to
+   the existing AI service with a five-year horizon.
+4. Return its prediction with an engineering-review recommendation based on the
+   low/medium/high repair-intensity band.
 
-The AI code predicts annual maintenance cost with a trained regression model.
-Repair-intensity bands are based on repair-rate tertiles in its training fleet;
-they are not model-predicted failure probability. The training data is synthetic
-and contains 24 ventilators from the `Getinge SERVOi` and `Draeger V500` model
-families. An unknown manufacturer/model family produces a warning. The backend
-rejects other equipment types rather than applying the ventilator model to them.
-The displayed MAE is a typical validation error, not a confidence interval.
+The historical `avg_annual_cost` is stored and displayed; it is the training target,
+not a prediction input. It is not substituted for the AI estimate. Replacement
+cost is no longer collected, so replacement-ratio fields returned by the existing
+AI service are null.
 
-The recommendation text is a transparent rule layered on the AI output. It
-suggests engineering review, not automatic replacement or permission to use a
-medical device. No failure dates, health scores, or anomaly scores are fabricated
-or written to the database. Assessment stays optional: equipment CRUD works when
-the AI service is offline.
+The model is unchanged: trained on 24 synthetic ventilators with manufacturer/model
+family categories `Getinge SERVOi` and `Draeger V500`. Do not silently map a new
+manufacturer label to one of these values. Unknown labels retain the existing
+model warning; align the team's training data and retrain when its vocabulary
+changes. No new training data was supplied as part of the eight-column change.
+
+Because the agreed dataset has no equipment-type column, the app cannot infer
+whether an item is a ventilator. Both the details screen and assessment response
+explicitly warn to confirm that the record belongs to the ventilator fleet before
+interpreting the model. The current model has not been validated for other devices.
+
+AI predicts annual maintenance cost. Repair-intensity bands use training-fleet
+repair-rate tertiles; they are not failure probabilities. MAE is a typical validation
+error, not a confidence interval. Recommendations suggest engineering review, not
+automatic replacement or clinical clearance. Equipment CRUD works if AI is offline.
 
 ## Code map
 
@@ -190,6 +226,7 @@ frontend/src/
   App.jsx                        Page layout and refresh coordination
   api.js                         JSON requests, timeouts and error parsing
   useApi.js                      Cancellable GET requests and refresh state
+  equipmentFields.js             Shared eight-field labels, types and formatting
   components/EquipmentForm.jsx   Create/edit form and validation
   components/EquipmentTable.jsx  Inventory, retry and delete confirmation
   components/EquipmentDetails.jsx Details and on-demand assessment
@@ -197,7 +234,8 @@ backend/app/
   main.py                        HTTP routes, readiness, safe error responses
   schemas.py                     Request, equipment and assessment validation
   database.py                    Environment settings and verified TLS connection
-  repository.py                  Parameterized SQL and API-to-RDS mapping
+  repository.py                  Parameterized SQL for the eight dataset fields
+  migrate.py                     Explicit transactional database migration
   assessment.py                  AI service client and recommendation mapping
 ai/app/                          Existing teammate's prediction/training code
 ```
@@ -227,7 +265,8 @@ Remove-Item Env:RUN_POSTGRES_TESTS, Env:RUN_AI_TESTS
 
 Live tests commit isolated records with generated `CODEX-TEST-` identifiers, verify
 persistence across separate requests, and delete only their own records afterward.
-They also verify updates, uniqueness, deletion and saved-record AI integration.
+They also verify updates, uniqueness, deletion, direct database constraints,
+leading-zero identifiers, source decimal preservation and saved-record AI integration.
 Run the optional real frontend HTTP flow with all services running:
 
 ```powershell
@@ -240,20 +279,22 @@ React interface, then deletes it. Its cleanup targets only that generated record
 ## Demo checklist
 
 - Confirm the API and database statuses are healthy.
-- Add a ventilator with unique identifiers and accurate lifecycle fields.
+- Add a fleet record with all eight source fields and unique identifiers.
 - Confirm it appears in the table; refresh the page to verify persistence.
 - Open Details & assessment, then Assess equipment.
 - Check estimated cost, repair intensity, recommendation and model warnings.
-- Edit the repair count and reassess; old results are cleared on changed data.
+- Edit supplied age, repair count or historical average; verify exact persistence.
+- Reassess after changing repairs; old results are cleared on changed data.
 - Stop the AI service and retry: assessment should fail clearly while CRUD works.
-- Try duplicate identifiers, an invalid date, and an unsupported device type.
+- Try duplicate identifiers, a missing field, a negative value and an invalid date.
+- Confirm a zero-age record can be saved but receives a clear assessment error.
 - Delete a demo device using the explicit confirmation.
 
 ## Troubleshooting
 
 - RDS timeout: check security-group access for your public IP, routing, or VPN.
 - Missing columns / wrong ID type: confirm the configured database uses the team's
-  UUID schema. Readiness checks the columns; it does not migrate tables.
+  UUID eight-field schema and run the explicit migration. Readiness does not migrate tables.
 - Missing CA: download the bundle and check `DB_SSLROOTCERT` in backend/.env.
 - AI unavailable: start its server on port 8001 and check model files/dependencies.
 - After a save with a lost response, refresh inventory before retrying to avoid

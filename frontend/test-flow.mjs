@@ -11,9 +11,11 @@ const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, s
 w.fetch = async (url, options = {}) => {
   const path = new URL(url).pathname
   if (path.endsWith('/assessment')) {
+    assert.equal(options.method, 'GET')
+    assert.equal(options.cache, 'no-store')
     assessmentCalls++
     if (failAssessment) return response({ detail: 'Assessment service unavailable. Retry later.' }, 503)
-    return response({ equipment_id: id, assessed_at: '2026-10-20T12:00:00Z', method: 'AI model',
+    return response({ equipment_id: id, risk_score: 0.625, risk_level: 'medium', assessed_at: '2026-10-20T12:00:00Z', method: 'AI model',
       recommendation: 'Review repair history with the engineering team.', limitation: 'Synthetic data; not failure probability.',
       prediction: { risk_level: 'medium', repair_rate_per_year: 1.2, predicted_annual_cost: 600,
         cost_error_range: 149.08, projected_cost_next_years: 3000, projection_years: 5,
@@ -53,23 +55,40 @@ async function setInput(key, value) {
   await wait()
 }
 const submit = () => w.document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
-const values = { name: 'SERVOi', type: 'Ventilator', location: 'ICU', asset_tag: 'TEST-1',
-  serial_number: 'SN-1', manufacturer: 'Getinge SERVOi', firmware_version: '1.0', in_service_date: '2020-01-01' }
+const values = { asset_tag: 'TEST-1', serial_number: '0000123', manufacturer: 'Getinge SERVOi',
+  in_service_date: '2003-03-03', age_years: '23.38', repair_events: '19',
+  total_historical_cost: '9678.12', avg_annual_cost: '413.95' }
 await until(() => text().includes('No equipment found'), 'initial inventory')
+assert.equal(w.document.querySelectorAll('form input').length, 8)
+assert.equal(w.document.querySelectorAll('form select').length, 0)
+for (const key of ['name', 'type', 'location', 'status', 'firmware_version', 'assumed_replacement_cost']) assert.equal(w.document.getElementById(key), null)
 submit(); await wait(); assert.equal(posts, 0); assert.match(text(), /This field is required/)
 for (const [key, value] of Object.entries(values)) await setInput(key, value)
+await setInput('avg_annual_cost', '')
+submit(); await wait(); assert.equal(posts, 0)
+assert.equal(w.document.getElementById('avg_annual_cost-error').textContent, 'This field is required.')
+await setInput('avg_annual_cost', '413.95')
+await setInput('age_years', '-1')
+submit(); await wait(); assert.equal(posts, 0)
+assert.match(w.document.getElementById('age_years-error').textContent, /non-negative/)
+await setInput('age_years', '23.38')
 submit(); await until(() => posts === 1, 'POST')
 assert.equal(w.document.querySelector('fieldset').disabled, true)
 submit(); await wait(); assert.equal(posts, 1)
 releaseSave()
 await until(() => w.document.querySelector('tbody'), 'table refresh')
 assert.match(text(), /Equipment saved/)
-assert.equal(w.document.getElementById('name').value, '')
+assert.equal(w.document.getElementById('asset_tag').value, '')
+assert.match(w.document.querySelector('tbody').textContent, /0000123/)
+assert.match(w.document.querySelector('tbody').textContent, /413\.95/)
+assert.equal(records[0].age_years, '23.38')
 assert.equal(w.document.querySelector('fieldset').disabled, false)
 button('Details & assessment').click(); await wait()
 button('Assess equipment').click()
 await until(() => text().includes('Repair intensity: medium'), 'assessment')
 assert.equal(assessmentCalls, 1)
+assert.match(text(), /0\.625/)
+assert.match(text(), /not the chance of failure/)
 assert.match(text(), /600\.00/)
 assert.match(text(), /Manufacturer not in training data/)
 assert.match(text(), /not failure probability/)
@@ -82,15 +101,15 @@ button('Assess equipment').click()
 await until(() => text().includes('Repair intensity: medium'), 'assessment retry')
 button('Edit').click(); await wait()
 assert.equal(w.document.getElementById('asset_tag').value, 'TEST-1')
-await setInput('location', 'Test lab')
+await setInput('avg_annual_cost', '321.09')
 await setInput('repair_events', '12')
 submit(); await until(() => text().includes('Equipment updated'), 'update')
-await until(() => w.document.querySelector('tbody').textContent.includes('Test lab'), 'updated table')
+await until(() => w.document.querySelector('tbody').textContent.includes('321.09'), 'updated table')
 assert.equal(records[0].repair_events, 12)
 assert.doesNotMatch(text(), /Repair intensity: medium/)
 for (const [key, value] of Object.entries(values)) await setInput(key, value)
 submit(); await until(() => text().includes('already exists'), 'duplicate conflict')
-assert.equal(w.document.getElementById('name').value, 'SERVOi')
+assert.equal(w.document.getElementById('serial_number').value, '0000123')
 failList = true
 button('Refresh table').click()
 await until(() => text().includes('Unable to refresh equipment'), 'refresh failure')

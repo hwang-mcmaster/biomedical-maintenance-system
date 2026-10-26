@@ -1,6 +1,6 @@
 """Call the team's existing AI service; keep model dependencies out of the API."""
 import os
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import HTTPException
@@ -18,16 +18,12 @@ RECOMMENDATIONS = {
 
 
 def assess_equipment(device):
-    if 'ventilator' not in device.type.casefold():
-        raise HTTPException(422, 'The current model supports ventilators only. Other device types need a suitable model.')
-    age = (date.today() - device.in_service_date).days / 365.25
-    if age <= 0:
-        raise HTTPException(422, 'Assessment requires an in-service date before today.')
+    if device.age_years <= 0:
+        raise HTTPException(422, 'Assessment requires a supplied age greater than zero.')
     payload = {
         'asset_tag': device.asset_tag, 'manufacturer': device.manufacturer,
-        'age_years': age, 'repair_events': device.repair_events,
+        'age_years': float(device.age_years), 'repair_events': device.repair_events,
         'cumulative_cost_to_date': float(device.total_historical_cost),
-        'assumed_replacement_cost': None if device.assumed_replacement_cost is None else float(device.assumed_replacement_cost),
         'projection_years': 5,
     }
     url = os.getenv('AI_SERVICE_URL', 'http://127.0.0.1:8001').rstrip('/')
@@ -38,8 +34,10 @@ def assess_equipment(device):
             prediction = Prediction.model_validate(response.json())
     except (httpx.HTTPError, ValueError, ValidationError):
         raise HTTPException(503, 'Assessment service unavailable. Check that the AI service and its model are running, then retry.') from None
+    prediction.warnings.insert(0, 'This dataset has no device-type field. Confirm that the item belongs to the ventilator fleet before interpreting this model output.')
     return Assessment(
-        equipment_id=device.id, assessed_at=datetime.now(timezone.utc),
+        equipment_id=device.id, risk_score=prediction.risk_score,
+        risk_level=prediction.risk_level, assessed_at=datetime.now(timezone.utc),
         method='AI maintenance-cost model + repair-intensity rules',
         recommendation=RECOMMENDATIONS[prediction.risk_level],
         limitation=LIMITATION, prediction=prediction,

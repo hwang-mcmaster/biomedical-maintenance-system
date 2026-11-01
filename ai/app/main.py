@@ -27,6 +27,14 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 MODEL_FILE = BASE_DIR / "models" / "cost_model.joblib"
 META_FILE = BASE_DIR / "models" / "model_metadata.json"
 
+# Assumed replacement cost per model label, in CAD.
+# None means no confirmed source yet. Used only when the request sends no
+# replacement cost of its own.
+REPLACEMENT_COST_CAD = {
+    "Getinge SERVOi": {"cost": None, "source": "to be confirmed", "as_of": None},
+    "Draeger V500": {"cost": None, "source": "to be confirmed", "as_of": None},
+}
+
 app = FastAPI(title="Biomedical Maintenance AI Service")
 
 
@@ -116,10 +124,20 @@ def predict_one(asset: AssetIn) -> PredictionOut:
     else:
         level = "medium"
 
-    ratio = None
-    if asset.cumulative_cost_to_date is not None and asset.assumed_replacement_cost:
-        ratio = asset.cumulative_cost_to_date / asset.assumed_replacement_cost
+    replacement_cost = asset.assumed_replacement_cost
+    if replacement_cost is None:
+        ref = REPLACEMENT_COST_CAD.get(asset.manufacturer.strip())
+        if ref and ref["cost"]:
+            replacement_cost = ref["cost"]
+            warnings.append(
+                f"Replacement cost {ref['cost']:,.0f} CAD is an assumption for "
+                f"{asset.manufacturer.strip()} (source: {ref['source']}, {ref['as_of']})."
+            )
 
+    ratio = None
+    if asset.cumulative_cost_to_date is not None and replacement_cost:
+        ratio = asset.cumulative_cost_to_date / replacement_cost
+	
     return PredictionOut(
         asset_tag=asset.asset_tag,
         predicted_annual_cost=round(annual, 2),
@@ -130,7 +148,7 @@ def predict_one(asset: AssetIn) -> PredictionOut:
         cumulative_cost_to_date=asset.cumulative_cost_to_date,
         projected_cost_next_years=round(annual * asset.projection_years, 2),
         projection_years=asset.projection_years,
-        assumed_replacement_cost=asset.assumed_replacement_cost,
+        assumed_replacement_cost=replacement_cost,
         maintenance_to_replacement_ratio=None if ratio is None else round(ratio, 3),
         warnings=warnings,
     )

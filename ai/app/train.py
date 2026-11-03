@@ -112,7 +112,7 @@ def main() -> None:
     final = make_pipeline(best_feats, LinearRegression()).fit(df[best_feats], y)
     names = final.named_steps["prep"].get_feature_names_out()
     coefs = final.named_steps["model"].coef_
-    print("Final model coefficients (effect on annual cost, $):")
+    print("Final model coefficients (effect on annual cost, CAD):")  
     for n, c in zip(names, coefs):
         print(f"  {n:<32} {c:+.3f}")
     print(f"  {'intercept':<32} {final.named_steps['model'].intercept_:+.3f}")
@@ -122,9 +122,12 @@ def main() -> None:
 
     MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(final, MODEL_FILE)
+    ref_file = DATA_FILE.parent / "reference_date.txt"
+    reference_date = ref_file.read_text(encoding="utf-8").strip() if ref_file.exists() else None
     meta = {
         "trained_at": datetime.now().isoformat(timespec="seconds"),
         "n_units": int(len(df)),
+        "age_reference_date": reference_date,
         "target": TARGET,
         "selected_feature_set": best_name,
         "features": best_feats,

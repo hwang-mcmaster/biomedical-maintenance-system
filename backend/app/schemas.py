@@ -71,3 +71,9 @@ class Assessment(BaseModel):
     recommendation: str
     limitation: str
     prediction: Prediction
+
+class MaintenanceSchedules(BaseModel):
+    scheduled_start_time: date
+    scheduled_end_time: date
+    status: Literal['pending', 'in_progress', 'completed', 'cancelled', "failed"]
+    priority_score: int

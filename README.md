@@ -66,8 +66,7 @@ Set-Location backend
 ### AI service: port 8001
 
 ```powershell
-Set-Location ai
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+.\ai.\venv\Scripts\python.exe -m uvicorn ai.app.main:app --reload --host 127.0.0.1 --port 8001
 ```
 
 ### Frontend: port 5173
@@ -142,6 +141,9 @@ must not be dropped/recreated to change the application schema.
 | PUT | /api/equipment/{uuid} | Updates source fields; returns recalculated record |
 | DELETE | /api/equipment/{uuid} | Deletes equipment; returns 204 |
 | GET | /api/equipment/{uuid}/assessment | Current AI-assisted assessment |
+| GET | /api/maintenance-schedules | Fetches all equipment entries in the maintenance scheduler |
+| GET | /api/ai/optimize-schedule | Triggers the maintenance scheduler to calculate dates for new equipment and 
+                                    optimize dates for existing equipment that will be serviced within 14 days |
 
 Example creation body:
 
@@ -195,21 +197,22 @@ CRUD works when the AI service is offline.
 
 ```text
 frontend/src/
-  App.jsx                         Page layout and refresh coordination
-  api.js                          Requests, timeouts and error parsing
-  useApi.js                       Cancellable GET requests and refresh state
-  equipmentFields.js              Eight display fields, six source fields, previews
-  components/EquipmentForm.jsx    Six inputs, two read-only calculated previews
-  components/EquipmentTable.jsx   Inventory, export, retry and delete confirmation
-  components/EquipmentDetails.jsx Recorded values, calculation date and assessment
+  App.jsx                                     Page layout and refresh coordination
+  api.js                                      Requests, timeouts and error parsing
+  useApi.js                                   Cancellable GET requests and refresh state
+  equipmentFields.js                          Eight display fields, six source fields, previews
+  components/EquipmentForm.jsx                Six inputs, two read-only calculated previews
+  components/EquipmentTable.jsx               Inventory, export, retry and delete confirmation
+  components/EquipmentDetails.jsx             Recorded values, calculation date and assessment
+  components/MaintenanceScheduleCalender.jsx  Calendar that displays all equipment scheduled for maintenance
 backend/app/
-  main.py                         Routes, CSV export and safe error responses
-  schemas.py                      Source-only requests and computed response fields
-  calculations.py                 Toronto date, unrounded age, annual average
-  database.py                     Environment settings and verified TLS connection
-  repository.py                   Parameterized SQL for source values only
-  assessment.py                   AI client and recommendation mapping
-  migrate.py                      Explicit current database migration
+  main.py                                     Routes, CSV export and safe error responses
+  schemas.py                                  Source-only requests and computed response fields
+  calculations.py                             Toronto date, unrounded age, annual average
+  database.py                                 Environment settings and verified TLS connection
+  repository.py                               Parameterized SQL for source values only
+  assessment.py                               AI client and recommendation mapping
+  migrate.py                                  Explicit current database migration
 ```
 
 ## Tests

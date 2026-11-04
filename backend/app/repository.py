@@ -39,3 +39,67 @@ def save_equipment(device, equipment_id=None):
 def delete_equipment(equipment_id):
     with get_connection() as connection:
         return connection.execute('DELETE FROM equipment WHERE equipment_id=%s RETURNING equipment_id', (equipment_id,)).fetchone()
+
+def get_maintenance_schedules():
+    with get_connection() as connection:
+        return connection.execute(
+            '''SELECT scheduled_start_time, scheduled_end_time, status, priority_score
+               FROM maintenance_schedules'''
+        ).fetchall()
+
+def get_equipment_due_for_maintenance():
+  with get_connection() as connection:
+      return connection.execute("""
+                SELECT e.equipment_id AS id, e.asset_tag, e.serial_number, e.manufacturer,
+                        e.in_service_date, e.repair_events, e.total_historical_cost FROM equipment e
+                LEFT JOIN maintenance_schedules ms ON e.equipment_id = ms.equipment_id
+                WHERE ms.scheduled_end_time <= CURRENT_TIMESTAMP + INTERVAL '14 days'
+                   OR ms.id IS NULL
+                ORDER BY e.created_at, e.equipment_id;
+            """).fetchall()
+
+def get_equipment_maintenance_schedule(equipment_id):
+    with get_connection() as connection:
+        return connection.execute(
+            '''SELECT scheduled_start_time, scheduled_end_time, status, priority_score
+               FROM maintenance_schedules WHERE equipment_id = %s''',
+            (equipment_id,)
+        ).fetchone()
+
+def save_optimized_maintenance_schedule(optimized_work_orders):
+    with get_connection() as connection:
+        try:
+            #Clear out 'pending' tasks inside the maintenance_schedules table
+            connection.execute(
+                """
+                    DELETE FROM maintenance_schedules 
+                    WHERE status IN ('scheduled', 'pending')
+                    AND scheduled_start_time >= CURRENT_TIMESTAMP
+                    AND scheduled_start_time <= CURRENT_TIMESTAMP + INTERVAL '14 days';
+                """
+            )
+
+            # Insert the new optimized equipment maintenance schedule entries.
+            for slot in optimized_work_orders.values():
+                connection.execute(
+                    """
+                        INSERT INTO maintenance_schedules 
+                        (equipment_id, scheduled_start_time, scheduled_end_time, status, priority_score)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """,
+                    (
+                        slot["equipment_id"],
+                        slot["scheduled_start_time"],
+                        slot["scheduled_end_time"],
+                        slot["status"],
+                        slot["priority_score"],
+                    ),
+                )
+
+            connection.commit()
+            print(f"Successfully committed {len(optimized_work_orders)} slots.")
+
+        except Exception as e:
+            connection.rollback()
+            print(f"Failed to save optimized maintenance schedule, rolled back changes: {e}")
+            raise e

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost:5173', runScripts: 'outside-only' })
 const w = dom.window
 const id = '49e7403c-a464-44be-bc4c-c1741b53ec11'
-let records = [], posts = 0, releaseSave, assessmentCalls = 0
+let records = [], posts = 0, releaseSave, assessmentCalls = 0, releaseAssessment
 let failList = false, failAssessment = false
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
 const asOf = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -19,12 +19,14 @@ w.fetch = async (url, options = {}) => {
     assert.equal(options.method, 'GET')
     assert.equal(options.cache, 'no-store')
     assessmentCalls++
+    if (assessmentCalls === 1) await new Promise(resolve => { releaseAssessment = resolve })
     if (failAssessment) return response({ detail: 'Assessment service unavailable. Retry later.' }, 503)
-    return response({ equipment_id: id, risk_score: 0.625, risk_level: 'medium', assessed_at: '2026-10-20T12:00:00Z', method: 'AI model',
-      recommendation: 'Review repair history with the engineering team.', limitation: 'Synthetic data; not failure probability.',
+    return response({ equipment_id: id, risk_score: 0.625, repair_rate_percentile: 0.625, risk_level: 'medium', assessed_at: '2026-10-20T12:00:00Z', method: 'AI model',
+      recommendation: 'Review repair history with the engineering team.', limitation: 'Prototype trained on synthetic ventilator data; not failure probability.',
       prediction: { risk_level: 'medium', repair_rate_per_year: 1.2, predicted_annual_cost: 600,
         cost_error_range: 149.08, projected_cost_next_years: 3000, projection_years: 5,
-        warnings: ['Manufacturer not in training data.'] } })
+        training_repair_rate_min: 0.81266, training_repair_rate_max: 2.272727,
+        warnings: ['Manufacturer not in training data.', 'Repair rate is outside the observed training range.', 'Manufacturer not in training data.'] } })
   }
   if (options.method === 'POST') {
     posts++
@@ -97,20 +99,33 @@ assert.equal(w.document.getElementById('repair_events').value, '0')
 assert.equal(w.document.getElementById('total_historical_cost').value, '0')
 assert.equal(w.document.querySelector('fieldset').disabled, false)
 button('Details & assessment').click(); await wait()
+assert.match(text(), /Not assessed yet/)
 button('Assess equipment').click()
+await until(() => releaseAssessment, 'assessment pending')
+assert.ok(button('Assessing…').disabled)
+assert.match(text(), /Assessing equipment/)
+releaseAssessment()
 await until(() => text().includes('Repair intensity: medium'), 'assessment')
 assert.equal(assessmentCalls, 1)
-assert.match(text(), /0\.625/)
+assert.match(text(), /62\.5%/)
+assert.match(text(), /Assessment complete/)
+assert.ok(button('Reassess equipment'))
+assert.equal(w.document.querySelectorAll('[aria-label="Model scope"]').length, 1)
+assert.equal([...w.document.querySelectorAll('.notice li')].filter(n => n.textContent.includes('Manufacturer')).length, 1)
+assert.equal(w.document.querySelectorAll('.assessment .error').length, 0)
+assert.match(text(), /outside the observed training range/)
+assert.match(text(), /Model-estimated annual cost/)
 assert.match(text(), /not the chance of failure/)
 assert.match(text(), /600\.00/)
 assert.match(text(), /Manufacturer not in training data/)
 assert.match(text(), /not failure probability/)
 failAssessment = true
-button('Assess equipment').click()
+button('Reassess equipment').click()
 await until(() => text().includes('Assessment service unavailable'), 'assessment error')
 assert.doesNotMatch(text(), /Repair intensity: medium/)
 failAssessment = false
-button('Assess equipment').click()
+assert.ok(button('Retry assessment'))
+button('Retry assessment').click()
 await until(() => text().includes('Repair intensity: medium'), 'assessment retry')
 button('Edit').click(); await wait()
 assert.equal(w.document.getElementById('asset_tag').value, 'TEST-1')

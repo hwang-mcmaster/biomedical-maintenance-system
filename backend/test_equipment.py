@@ -20,7 +20,8 @@ PREDICTION = dict(asset_tag='TEST-1', predicted_annual_cost=600, cost_error_rang
                   repair_rate_per_year=1.5, risk_score=0.8, risk_level='high',
                   cumulative_cost_to_date=1000, projected_cost_next_years=3000,
                   projection_years=5, assumed_replacement_cost=None,
-                  maintenance_to_replacement_ratio=None, warnings=['Example model warning'])
+                  maintenance_to_replacement_ratio=None, warnings=['Example model warning'],
+                  training_repair_rate_min=1.0, training_repair_rate_max=2.0)
 
 
 class EquipmentTests(unittest.TestCase):
@@ -132,6 +133,7 @@ class EquipmentTests(unittest.TestCase):
         body = result.json()
         self.assertEqual(body['equipment_id'], ID)
         self.assertEqual(body['risk_score'], 0.8)
+        self.assertEqual(body['repair_rate_percentile'], 0.8)
         self.assertEqual(result.headers['cache-control'], 'no-store')
         self.assertIn('Prioritize', body['recommendation'])
         sent = client.return_value.__enter__.return_value.post.call_args.kwargs['json']
@@ -166,3 +168,38 @@ class EquipmentTests(unittest.TestCase):
             'Access-Control-Request-Headers': 'content-type',
         })
         self.assertEqual(response.status_code, 200)
+
+
+class AssessmentPresentationTests(unittest.TestCase):
+    @patch('app.assessment.httpx.Client')
+    def test_range_boundaries_and_outliers(self, client):
+        from app.assessment import assess_equipment
+        for repairs, outside in [(10, True), (20, False), (30, False), (40, False), (60, True)]:
+            client.return_value.__enter__.return_value.post.return_value.json.return_value = PREDICTION
+            # Exactly 20 years: elapsed days include leap years.
+            device = Equipment.model_validate(PAYLOAD | {'id': ID, 'in_service_date': '2000-01-01',
+                'calculated_as_of': date(2020, 1, 1), 'repair_events': repairs})
+            result = assess_equipment(device)
+            self.assertEqual(any('outside the observed training range' in w for w in result.prediction.warnings), outside)
+            self.assertFalse(any('device-type field' in w for w in result.prediction.warnings))
+
+    @patch('app.assessment.httpx.Client')
+    def test_projection_uses_returned_annual_cents(self, client):
+        from app.assessment import assess_equipment
+        raw = PREDICTION | {'predicted_annual_cost': 299.50, 'projected_cost_next_years': 1497.51,
+                            'warnings': ['One notice', 'One notice']}
+        client.return_value.__enter__.return_value.post.return_value.json.return_value = raw
+        result = assess_equipment(Equipment.model_validate(PAYLOAD | {'id': ID}))
+        self.assertEqual(result.prediction.projected_cost_next_years, 1497.50)
+        self.assertEqual(result.prediction.warnings.count('One notice'), 1)
+
+    @patch('app.assessment.httpx.Client')
+    def test_missing_range_is_explicit_and_legacy_score_is_preserved(self, client):
+        from app.assessment import assess_equipment
+        raw = {key: value for key, value in PREDICTION.items() if not key.startswith('training_repair_rate_')}
+        raw['risk_score'] = 0
+        client.return_value.__enter__.return_value.post.return_value.json.return_value = raw
+        result = assess_equipment(Equipment.model_validate(PAYLOAD | {'id': ID}))
+        self.assertEqual(result.risk_score, 0)
+        self.assertEqual(result.repair_rate_percentile, 0)
+        self.assertTrue(any('range is unavailable' in w for w in result.prediction.warnings))

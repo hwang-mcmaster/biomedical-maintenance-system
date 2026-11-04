@@ -191,6 +191,28 @@ MAE is typical validation error, not a confidence interval. Five-year cost is a
 simple annual estimate times five. Results are on demand, not saved to equipment.
 CRUD works when the AI service is offline.
 
+### Assessment presentation and range checks
+
+The screen distinguishes recorded historical average cost from model-estimated
+annual cost. `repair_rate_percentile` is the clearer response alias for the legacy
+`risk_score` (both remain 0 to 1); the UI displays it as a percentage. A percentile
+of 0% means below the observed fleet repair rates, not zero failure risk.
+
+The AI prediction response includes training_repair_rate_min/max from the loaded
+model metadata. The backend compares the actual repair rate against these bounds
+at the metadata's six-decimal precision and adds a notice for extrapolation. An
+older AI response without these fields gets an explicit range-unavailable notice.
+No thresholds are hardcoded and no model weights or training data were changed.
+
+Annual cost is rounded to cents first; the projection is that same annual amount
+multiplied by the horizon. Thus CAD $299.50/year over five years displays CAD
+$1,497.50 consistently. This is a presentation policy, not a new forecasting model.
+
+Assessment has explicit not-assessed/loading/complete/error states, Reassess and
+Retry controls, one scope note, and deduplicated neutral informational notices.
+Only actual request errors use error styling. Restart backend and AI service after
+updating to ensure the range metadata is available.
+
 ## Code map
 
 ```text
@@ -247,3 +269,9 @@ leading-zero identifiers, safe errors and ignoring old snapshot columns.
 - Port in use: stop the old server before starting another on that port.
 - A lost save response: refresh inventory before retrying. Unique asset tags and
   serial numbers protect inserts from duplicate identifiers.
+
+The AI response contract/rounding test can be run from ai/ with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s . -p test_prediction.py
+```

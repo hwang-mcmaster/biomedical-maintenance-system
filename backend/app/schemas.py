@@ -60,6 +60,8 @@ class Prediction(BaseModel):
     assumed_replacement_cost: float | None
     maintenance_to_replacement_ratio: float | None
     warnings: list[str]
+    training_repair_rate_min: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+    training_repair_rate_max: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
 
 
 class Assessment(BaseModel):
@@ -71,3 +73,10 @@ class Assessment(BaseModel):
     recommendation: str
     limitation: str
     prediction: Prediction
+
+
+    @computed_field
+    @property
+    def repair_rate_percentile(self) -> float:
+        # Keep risk_score for older clients; use the clearer name in new displays.
+        return self.risk_score

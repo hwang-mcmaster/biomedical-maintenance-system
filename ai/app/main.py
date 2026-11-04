@@ -13,6 +13,7 @@ The model is trained by app/train.py on synthetic data. The risk level is a
 repair-intensity indicator, NOT a failure probability.
 """
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from bisect import bisect_right
 from functools import lru_cache
 from pathlib import Path
@@ -77,6 +78,8 @@ class PredictionOut(BaseModel):
     assumed_replacement_cost: Optional[float]
     maintenance_to_replacement_ratio: Optional[float]
     warnings: List[str]
+    training_repair_rate_min: float
+    training_repair_rate_max: float
 
 
 class FleetIn(BaseModel):
@@ -134,23 +137,30 @@ def predict_one(asset: AssetIn) -> PredictionOut:
                 f"{asset.manufacturer.strip()} (source: {ref['source']}, {ref['as_of']})."
             )
 
+<<<<<<< Updated upstream
     ratio = None
     if asset.cumulative_cost_to_date is not None and replacement_cost:
         ratio = asset.cumulative_cost_to_date / replacement_cost
 	
+=======
+    # Project from the same cent-rounded annual amount returned to clients.
+    annual_amount = Decimal(str(annual)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+>>>>>>> Stashed changes
     return PredictionOut(
         asset_tag=asset.asset_tag,
-        predicted_annual_cost=round(annual, 2),
+        predicted_annual_cost=float(annual_amount),
         cost_error_range=round(meta["selected_mae"], 2),
         repair_rate_per_year=round(repair_rate, 4),
         risk_score=round(risk_score, 3),
         risk_level=level,
         cumulative_cost_to_date=asset.cumulative_cost_to_date,
-        projected_cost_next_years=round(annual * asset.projection_years, 2),
+        projected_cost_next_years=float(annual_amount * asset.projection_years),
         projection_years=asset.projection_years,
         assumed_replacement_cost=replacement_cost,
         maintenance_to_replacement_ratio=None if ratio is None else round(ratio, 3),
         warnings=warnings,
+        training_repair_rate_min=min(fleet),
+        training_repair_rate_max=max(fleet),
     )
 
 

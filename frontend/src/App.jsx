@@ -8,6 +8,7 @@ import EquipmentDetails from './components/EquipmentDetails'
 function App() {
   const health = useApi('/api/health')
   const [revision, setRevision] = useState(0)
+  const options = useApi('/api/equipment/options', revision)
   const ready = useApi('/api/ready', revision)
   const equipment = useApi('/api/equipment', revision)
   const [editing, setEditing] = useState(null)
@@ -47,7 +48,7 @@ function App() {
         </div>
       </section>
       <p role="status" aria-live="polite">{message}</p>
-      <EquipmentForm key={editing?.id || 'new'} device={editing} onSaved={saved} onCancel={() => setEditing(null)} />
+      <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
       <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
         onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
       {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}

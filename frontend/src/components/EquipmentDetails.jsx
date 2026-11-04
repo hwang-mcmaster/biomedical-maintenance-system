@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
 import { request } from '../api'
-import { equipmentFields, displayValue } from '../equipmentFields'
+import { equipmentFields, fieldGroups, displayValue } from '../equipmentFields'
 
-const amount = (value) => Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const amount = (value) => value == null ? 'N/A' : Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const percentile = (value) => new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 }).format(value)
-const scopeNote = 'Prototype trained on synthetic ventilator data. Confirm that this item belongs to the ventilator fleet; device type is not recorded. Repair intensity is not failure probability or clinical safety. Recommendations require engineering review.'
+const scopeNote = 'Prototype trained on synthetic ventilator data. Repair intensity is not failure probability or clinical safety. Expected useful life is a reference, not a model prediction. Recommendations require engineering review.'
 
 export default function EquipmentDetails({ device, onClose }) {
   const [assessment, setAssessment] = useState(null)
@@ -29,17 +29,17 @@ export default function EquipmentDetails({ device, onClose }) {
     <section className="panel" aria-labelledby="details-heading">
       <div className="section-heading"><h2 id="details-heading">Equipment details: {device.asset_tag}</h2>
         <button type="button" className="secondary" onClick={onClose}>Close details</button></div>
-      <dl className="details-grid">
-        {equipmentFields.map(({ key, label }) => <div key={key}>
-          <dt>{key === 'avg_annual_cost' ? 'Historical average annual cost (CAD $)' : label}</dt>
-          <dd>{displayValue(key, device[key])}</dd>
-        </div>)}
-      </dl>
+      {fieldGroups.map((group) => <div key={group}><h3>{group}</h3><dl className="details-grid">
+        {equipmentFields.filter((field) => field.group === group).map(({ key, label }) => <div key={key}><dt>{label}</dt><dd>{displayValue(key, device[key])}</dd></div>)}
+      </dl></div>)}
       <p className="subtitle">Age and historical annual average calculated as of {device.calculated_as_of}. Amounts are in CAD.</p>
       <h3>AI-assisted maintenance review</h3>
       <aside className="notice" aria-label="Model scope"><p>{assessment?.limitation || scopeNote}</p></aside>
       <p role="status" aria-live="polite">{loading ? 'Assessing equipment…' : assessment ? 'Assessment complete.' : error ? 'Assessment failed. Please retry.' : 'Not assessed yet.'}</p>
-      <button type="button" disabled={loading} onClick={assess}>
+      {device.device_type !== 'Ventilator' && <p className="notice">{device.device_type
+        ? 'The current assessment model supports Ventilator equipment only. This device type needs a suitable model.'
+        : 'Edit this equipment and record its device type before assessment.'}</p>}
+      <button type="button" disabled={loading || device.device_type !== 'Ventilator'} onClick={assess}>
         {loading ? 'Assessing…' : assessment ? 'Reassess equipment' : attempted ? 'Retry assessment' : 'Assess equipment'}
       </button>
       {error && <p role="alert" className="error">{error}</p>}
@@ -50,6 +50,8 @@ export default function EquipmentDetails({ device, onClose }) {
           <ul>{notices.map((notice) => <li key={notice}>{notice}</li>)}</ul>
         </aside>}
         <dl className="details-grid">
+          <div><dt>Model input category</dt><dd>{prediction.model_input_category || 'Not available'}</dd></div>
+          <div><dt>Historical maintenance / replacement cost</dt><dd>{prediction.maintenance_to_replacement_ratio == null ? 'N/A (positive replacement cost required)' : percentile(prediction.maintenance_to_replacement_ratio)}</dd></div>
           <div><dt>Repair-rate percentile</dt><dd>{percentile(assessment.repair_rate_percentile)}</dd></div>
           <div><dt>Percentile meaning</dt><dd>Share of training devices with an equal or lower repair rate; not the chance of failure. A percentile of 0% does not mean zero failure risk.</dd></div>
           <div><dt>Historical average annual cost (CAD $)</dt><dd>${amount(device.avg_annual_cost)}</dd></div>

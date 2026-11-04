@@ -9,6 +9,10 @@ from .calculations import reference_date, exact_age, two_places, annual_average
 
 Text100 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 Text50 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+DEVICE_TYPES = ('Ventilator', 'Infusion Pump', 'Patient Monitor', 'Defibrillator', 'Other')
+STATUSES = ('Operational', 'Under Maintenance', 'Inactive')
+OptionalText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
 Money = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
 
 
@@ -20,6 +24,33 @@ class EquipmentData(BaseModel):
     in_service_date: date
     repair_events: Annotated[int, Field(strict=True, ge=0, le=2147483647)] = 0
     total_historical_cost: Money = Decimal('0.00')
+    model_number: OptionalText | None = None
+    model_name: OptionalText | None = None
+    device_type: Literal['Ventilator', 'Infusion Pump', 'Patient Monitor', 'Defibrillator', 'Other'] | None = None
+    firmware_version: Text50 | None = None
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)] | None = None
+    department: OptionalText | None = None
+    department_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)] | None = None
+    location: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] | None = None
+    status: Literal['Operational', 'Under Maintenance', 'Inactive'] | None = None
+    replacement_cost: Money | None = None
+    expected_useful_life: Annotated[int, Field(strict=True, ge=1, le=2147483647)] | None = None
+
+    @field_validator('model_number', 'model_name', 'device_type', 'firmware_version',
+                     'description', 'department', 'department_code', 'location', 'status', mode='before')
+    @classmethod
+    def normalize_optional_text(cls, value, info):
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value:
+            return None
+        if info.field_name in ('device_type', 'status'):
+            choices = DEVICE_TYPES if info.field_name == 'device_type' else STATUSES
+            normalized = value.replace('_', ' ').casefold()
+            return next((item for item in choices if item.casefold() == normalized), value)
+        return value
+
 
 
 class EquipmentCreate(EquipmentData):
@@ -47,6 +78,15 @@ class Equipment(EquipmentData):
         return annual_average(self.total_historical_cost, age)
 
 
+    @computed_field
+    @property
+    def reference_remaining_life_years(self) -> Decimal | None:
+        if self.expected_useful_life is None:
+            return None
+        remaining = Decimal(self.expected_useful_life) - exact_age(self.in_service_date, self.calculated_as_of)
+        return two_places(max(Decimal(0), remaining))
+
+
 class Prediction(BaseModel):
     asset_tag: str | None
     predicted_annual_cost: Annotated[float, Field(ge=0, allow_inf_nan=False)]
@@ -60,6 +100,8 @@ class Prediction(BaseModel):
     assumed_replacement_cost: float | None
     maintenance_to_replacement_ratio: float | None
     warnings: list[str]
+    model_input_category: str | None = None
+    reference_remaining_life_years: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
     training_repair_rate_min: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
     training_repair_rate_max: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
 

@@ -11,7 +11,7 @@ from . import repository
 from .assessment import assess_equipment
 from .database import get_connection
 from .calculations import reference_date
-from .schemas import Assessment, Equipment, EquipmentCreate
+from .schemas import Assessment, Equipment, EquipmentCreate, DEVICE_TYPES, STATUSES
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title='Biomedical Maintenance API')
@@ -52,6 +52,11 @@ def ready():
     with get_connection() as connection:
         connection.execute(f'SELECT {repository.COLUMNS} FROM equipment LIMIT 0')
     return {'status': 'ok', 'message': 'Equipment database is ready'}
+
+
+@app.get('/api/equipment/options')
+def equipment_options():
+    return {'device_types': DEVICE_TYPES, 'statuses': STATUSES, 'useful_life_unit': 'years', 'currency': 'CAD'}
 
 
 @app.get('/api/equipment', response_model=list[Equipment])

@@ -10,9 +10,8 @@ from pydantic import ValidationError
 from .schemas import Assessment, Prediction
 from .calculations import exact_age, two_places
 
-LIMITATION = ('Prototype trained on synthetic ventilator data. Confirm that this item belongs to the ventilator fleet; '
-              'device type is not recorded. Repair intensity is not failure probability or clinical safety. '
-              'Recommendations require engineering review.')
+LIMITATION = ('Prototype trained on synthetic ventilator data. Repair intensity is not failure probability or clinical safety. '
+              'Expected useful life is a supplied reference, not a model prediction. Recommendations require engineering review.')
 RECOMMENDATIONS = {
     'low': 'Keep this item in the routine maintenance review queue; verify service records and manufacturer guidance.',
     'medium': 'Review repair history and planned maintenance with the biomedical engineering team.',
@@ -21,6 +20,10 @@ RECOMMENDATIONS = {
 
 
 def assess_equipment(device):
+    if device.device_type is None:
+        raise HTTPException(422, 'Record the equipment device type before requesting assessment.')
+    if device.device_type != 'Ventilator':
+        raise HTTPException(422, 'The current model supports Ventilator equipment only. This item needs a suitable model.')
     age = exact_age(device.in_service_date, device.calculated_as_of)
     if age <= 0:
         raise HTTPException(422, 'Assessment requires a positive elapsed age. Check the in-service date.')
@@ -28,7 +31,10 @@ def assess_equipment(device):
         'asset_tag': device.asset_tag, 'manufacturer': device.manufacturer,
         'age_years': float(age), 'repair_events': device.repair_events,
         'cumulative_cost_to_date': float(device.total_historical_cost),
-        'projection_years': 5,
+        'projection_years': 5, 'device_type': device.device_type,
+        'model_number': device.model_number, 'model_name': device.model_name,
+        'assumed_replacement_cost': None if device.replacement_cost is None else float(device.replacement_cost),
+        'expected_useful_life': device.expected_useful_life,
     }
     url = os.getenv('AI_SERVICE_URL', 'http://127.0.0.1:8001').rstrip('/')
     try:

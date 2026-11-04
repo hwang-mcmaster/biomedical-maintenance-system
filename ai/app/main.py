@@ -17,12 +17,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from bisect import bisect_right
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 MODEL_FILE = BASE_DIR / "models" / "cost_model.joblib"
@@ -56,13 +56,26 @@ def load_model():
 # ---------- request / response models ----------
 
 class AssetIn(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    device_type: Literal['Ventilator']
+    model_number: Optional[str] = Field(None, max_length=100)
+    model_name: Optional[str] = Field(None, max_length=100)
+    expected_useful_life: Optional[int] = Field(None, strict=True, gt=0)
     asset_tag: Optional[str] = Field(None, examples=["CED-10000"])
-    manufacturer: str = Field(..., examples=["Getinge SERVOi"])
+    manufacturer: str = Field(..., min_length=1, max_length=100, examples=["Getinge SERVOi"])
     age_years: float = Field(..., gt=0, examples=[23.38])
-    repair_events: int = Field(..., ge=0, examples=[19])
+    repair_events: int = Field(..., strict=True, ge=0, examples=[19])
     cumulative_cost_to_date: Optional[float] = Field(None, ge=0, examples=[9678.12])
-    assumed_replacement_cost: Optional[float] = Field(None, gt=0, examples=[20000.0])
+    assumed_replacement_cost: Optional[float] = Field(None, ge=0, examples=[20000.0])
     projection_years: int = Field(5, ge=1, le=20)
+
+
+    @field_validator('manufacturer', 'model_number', 'model_name', mode='before')
+    @classmethod
+    def trim_input_text(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 class PredictionOut(BaseModel):
@@ -78,6 +91,8 @@ class PredictionOut(BaseModel):
     assumed_replacement_cost: Optional[float]
     maintenance_to_replacement_ratio: Optional[float]
     warnings: List[str]
+    model_input_category: str
+    reference_remaining_life_years: Optional[float]
     training_repair_rate_min: float
     training_repair_rate_max: float
 
@@ -98,12 +113,27 @@ class FleetSummaryOut(BaseModel):
 
 # ---------- prediction logic ----------
 
+def resolve_training_category(asset, categories):
+    # Explicitly match recorded maker/model to the labels used by the existing
+    # model. No weights are changed, and unknown categories retain their warning.
+    def normalize(value):
+        return ' '.join(value.casefold().replace('ä', 'ae').split())
+    candidates = [asset.manufacturer]
+    candidates.extend(f'{asset.manufacturer} {model}' for model in [asset.model_name, asset.model_number] if model)
+    for candidate in candidates:
+        match = next((label for label in categories if normalize(label) == normalize(candidate)), None)
+        if match:
+            return match
+    return asset.manufacturer
+
+
 def predict_one(asset: AssetIn) -> PredictionOut:
     model, meta = load_model()
     repair_rate = asset.repair_events / asset.age_years
+    category = resolve_training_category(asset, meta["manufacturers"])
 
     row = pd.DataFrame([{
-        "manufacturer": asset.manufacturer.strip(),
+        "manufacturer": category,
         "age_years": asset.age_years,
         "repair_events": asset.repair_events,
         "repair_rate": repair_rate,
@@ -111,7 +141,7 @@ def predict_one(asset: AssetIn) -> PredictionOut:
     annual = max(0.0, float(model.predict(row)[0]))
 
     warnings = []
-    if "manufacturer" in meta["features"] and asset.manufacturer.strip() not in meta["manufacturers"]:
+    if "manufacturer" in meta["features"] and category not in meta["manufacturers"]:
         warnings.append(
             f"Manufacturer '{asset.manufacturer}' was not in the training data "
             f"({', '.join(meta['manufacturers'])}); its effect was ignored."
@@ -129,7 +159,7 @@ def predict_one(asset: AssetIn) -> PredictionOut:
 
     replacement_cost = asset.assumed_replacement_cost
     if replacement_cost is None:
-        ref = REPLACEMENT_COST_CAD.get(asset.manufacturer.strip())
+        ref = REPLACEMENT_COST_CAD.get(category)
         if ref and ref["cost"]:
             replacement_cost = ref["cost"]
             warnings.append(
@@ -137,15 +167,19 @@ def predict_one(asset: AssetIn) -> PredictionOut:
                 f"{asset.manufacturer.strip()} (source: {ref['source']}, {ref['as_of']})."
             )
 
-<<<<<<< Updated upstream
     ratio = None
-    if asset.cumulative_cost_to_date is not None and replacement_cost:
+    if asset.cumulative_cost_to_date is not None and replacement_cost and replacement_cost > 0:
         ratio = asset.cumulative_cost_to_date / replacement_cost
-	
-=======
+    elif replacement_cost == 0:
+        warnings.append('Replacement cost is zero; maintenance-to-replacement ratio is unavailable.')
     # Project from the same cent-rounded annual amount returned to clients.
     annual_amount = Decimal(str(annual)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
->>>>>>> Stashed changes
+    reference_remaining = None
+    if asset.expected_useful_life is not None:
+        reference_remaining = round(max(0.0, asset.expected_useful_life - asset.age_years), 2)
+        if asset.age_years >= asset.expected_useful_life:
+            warnings.append('Recorded expected useful life has been reached. This is a reference threshold, not a predicted failure date.')
+
     return PredictionOut(
         asset_tag=asset.asset_tag,
         predicted_annual_cost=float(annual_amount),
@@ -159,6 +193,8 @@ def predict_one(asset: AssetIn) -> PredictionOut:
         assumed_replacement_cost=replacement_cost,
         maintenance_to_replacement_ratio=None if ratio is None else round(ratio, 3),
         warnings=warnings,
+        model_input_category=category,
+        reference_remaining_life_years=reference_remaining,
         training_repair_rate_min=min(fleet),
         training_repair_rate_max=max(fleet),
     )

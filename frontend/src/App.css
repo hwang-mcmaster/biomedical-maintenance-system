@@ -44,3 +44,6 @@ output { display: block; box-sizing: border-box; width: 100%; max-width: 480px; 
 .notice ul { margin-bottom: 0; padding-left: 20px; }
 .table-wrapper table { min-width: 1150px; }
 td[data-field="asset_tag"], td[data-field="serial_number"], td[data-field="in_service_date"], td[data-field="age_years"], td[data-field="repair_events"], td[data-field="total_historical_cost"], td[data-field="avg_annual_cost"] { white-space: nowrap; }
+
+textarea { box-sizing: border-box; width: 100%; max-width: 480px; padding: 10px; border: 1px solid #8799ad; border-radius: 5px; font: inherit; resize: vertical; }
+.form-group { margin-bottom: 24px; }

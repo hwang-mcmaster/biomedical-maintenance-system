@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { request, API_URL } from '../api'
-import { equipmentFields, displayValue } from '../equipmentFields'
+import { inventoryFields, displayValue } from '../equipmentFields'
 
 export default function EquipmentTable({ devices, loading, error, onRefresh, onDetails, onEdit, onDeleted }) {
   const [confirmId, setConfirmId] = useState(null)
@@ -34,9 +34,9 @@ export default function EquipmentTable({ devices, loading, error, onRefresh, onD
       {deleteError && <p role="alert" className="error">{deleteError}</p>}
       {devices.length > 0 && <div className="table-wrapper"><table>
         <caption className="sr-only">Biomedical equipment inventory</caption>
-        <thead><tr>{[...equipmentFields.map(({ label }) => label), 'Actions'].map((heading) => <th key={heading} scope="col">{heading}</th>)}</tr></thead>
+        <thead><tr>{[...inventoryFields.map(({ label }) => label), 'Actions'].map((heading) => <th key={heading} scope="col">{heading}</th>)}</tr></thead>
         <tbody>{devices.map((device) => <tr key={device.id}>
-          {equipmentFields.map(({ key }) => <td key={key} data-field={key}>{displayValue(key, device[key])}</td>)}
+          {inventoryFields.map(({ key }) => <td key={key} data-field={key}>{displayValue(key, device[key])}</td>)}
           <td><div className="actions">
             <button type="button" className="secondary" onClick={() => onDetails(device.id)}>Details & assessment</button>
             <button type="button" className="secondary" onClick={() => onEdit(device)}>Edit</button>

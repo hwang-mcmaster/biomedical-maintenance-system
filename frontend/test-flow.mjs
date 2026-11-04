@@ -15,6 +15,7 @@ const calculated = (record) => {
 }
 w.fetch = async (url, options = {}) => {
   const path = new URL(url).pathname
+  if (path.endsWith('/options')) return response({ device_types: ['Ventilator','Infusion Pump','Patient Monitor','Defibrillator','Other'], statuses: ['Operational','Under Maintenance','Inactive'] })
   if (path.endsWith('/assessment')) {
     assert.equal(options.method, 'GET')
     assert.equal(options.cache, 'no-store')
@@ -23,7 +24,7 @@ w.fetch = async (url, options = {}) => {
     if (failAssessment) return response({ detail: 'Assessment service unavailable. Retry later.' }, 503)
     return response({ equipment_id: id, risk_score: 0.625, repair_rate_percentile: 0.625, risk_level: 'medium', assessed_at: '2026-10-20T12:00:00Z', method: 'AI model',
       recommendation: 'Review repair history with the engineering team.', limitation: 'Prototype trained on synthetic ventilator data; not failure probability.',
-      prediction: { risk_level: 'medium', repair_rate_per_year: 1.2, predicted_annual_cost: 600,
+      prediction: { model_input_category: 'Getinge SERVOi', maintenance_to_replacement_ratio: 0.75, risk_level: 'medium', repair_rate_per_year: 1.2, predicted_annual_cost: 600,
         cost_error_range: 149.08, projected_cost_next_years: 3000, projection_years: 5,
         training_repair_rate_min: 0.81266, training_repair_rate_max: 2.272727,
         warnings: ['Manufacturer not in training data.', 'Repair rate is outside the observed training range.', 'Manufacturer not in training data.'] } })
@@ -34,7 +35,9 @@ w.fetch = async (url, options = {}) => {
     if (records.some((r) => r.asset_tag === payload.asset_tag)) return response({ detail: 'Asset tag or serial number already exists. Use unique values.' }, 409)
     await new Promise(resolve => { releaseSave = resolve })
     const record = { ...payload, id }; records.push(record)
-    assert.equal(Object.keys(payload).length, 6)
+    assert.equal(Object.keys(payload).length, 17)
+    assert.equal(payload.department_code, '001')
+    assert.equal(payload.device_type, 'Ventilator')
     assert.equal('age_years' in payload, false)
     assert.equal('avg_annual_cost' in payload, false)
     return response(calculated(record), 201)
@@ -59,21 +62,23 @@ const text = () => w.document.body.textContent
 const button = (label) => [...w.document.querySelectorAll('button')].find(b => b.textContent === label)
 async function setInput(key, value) {
   const input = w.document.getElementById(key)
-  const prototype = input.tagName === 'SELECT' ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype
+  const prototype = input.tagName === 'SELECT' ? w.HTMLSelectElement.prototype : input.tagName === 'TEXTAREA' ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype
   Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, value)
   input.dispatchEvent(new w.Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
   await wait()
 }
 const submit = () => w.document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
-const values = { asset_tag: 'TEST-1', serial_number: '0000123', manufacturer: 'Getinge SERVOi',
+const values = { asset_tag: 'TEST-1', serial_number: '0000123', manufacturer: 'Getinge', device_type: 'Ventilator', model_name: 'SERVOi', model_number: 'SERVOi',
+  firmware_version: '1.0', description: 'Fixture device', department: 'ICU', department_code: '001',
+  location: 'Room 12', status: 'Operational', replacement_cost: '20000.00', expected_useful_life: '25',
   in_service_date: '2003-03-03', repair_events: '19', total_historical_cost: '9678.12' }
 await until(() => text().includes('No equipment found'), 'initial inventory')
-assert.equal(w.document.querySelectorAll('form input').length, 6)
-assert.equal(w.document.querySelectorAll('form select').length, 0)
-for (const key of ['name', 'type', 'location', 'status', 'firmware_version', 'assumed_replacement_cost']) assert.equal(w.document.getElementById(key), null)
+assert.equal(w.document.querySelectorAll('form input').length, 14)
+assert.equal(w.document.querySelectorAll('form select').length, 2)
+for (const key of ['name', 'type', 'assumed_replacement_cost']) assert.equal(w.document.getElementById(key), null)
 submit(); await wait(); assert.equal(posts, 0); assert.match(text(), /This field is required/)
 for (const [key, value] of Object.entries(values)) await setInput(key, value)
-assert.equal(w.document.querySelectorAll('form output').length, 2)
+assert.equal(w.document.querySelectorAll('form output').length, 3)
 assert.equal(w.document.getElementById('age_years').tagName, 'OUTPUT')
 assert.equal(w.document.getElementById('avg_annual_cost').tagName, 'OUTPUT')
 assert.equal(w.document.getElementById('avg_annual_cost').textContent, Number(calculated(values).avg_annual_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
@@ -115,6 +120,8 @@ assert.equal([...w.document.querySelectorAll('.notice li')].filter(n => n.textCo
 assert.equal(w.document.querySelectorAll('.assessment .error').length, 0)
 assert.match(text(), /outside the observed training range/)
 assert.match(text(), /Model-estimated annual cost/)
+assert.match(text(), /Model input category/)
+assert.match(text(), /75%/)
 assert.match(text(), /not the chance of failure/)
 assert.match(text(), /600\.00/)
 assert.match(text(), /Manufacturer not in training data/)
@@ -133,9 +140,10 @@ const oldAgePreview = w.document.getElementById('age_years').textContent
 await setInput('in_service_date', '2000-01-01')
 assert.notEqual(w.document.getElementById('age_years').textContent, oldAgePreview)
 await setInput('total_historical_cost', '321.09')
+await setInput('model_name', 'Updated model')
 await setInput('repair_events', '12')
 submit(); await until(() => text().includes('Equipment updated'), 'update')
-await until(() => w.document.querySelector('tbody').textContent.includes('321.09'), 'updated table')
+await until(() => w.document.querySelector('tbody').textContent.includes('Updated model'), 'updated table')
 assert.equal(records[0].repair_events, 12)
 assert.doesNotMatch(text(), /Repair intensity: medium/)
 for (const [key, value] of Object.entries(values)) await setInput(key, value)

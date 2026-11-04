@@ -46,12 +46,17 @@ class PostgresTests(unittest.TestCase):
         self.assertEqual(retrieved['in_service_date'], '2020-01-01')
         self.assertEqual(Decimal(retrieved['total_historical_cost']), Decimal('5678.90'))
         self.assertEqual(retrieved['repair_events'], 12)
+        self.assertEqual(retrieved['model_name'], 'SERVOi')
+        self.assertEqual(retrieved['department_code'], '001')
+        self.assertEqual(retrieved['location'], 'Room 12')
+        self.assertEqual(Decimal(retrieved['replacement_cost']), Decimal('20000.00'))
+        self.assertEqual(retrieved['status'], 'Operational')
         from app.calculations import exact_age, annual_average, reference_date
         from datetime import date
         age = exact_age(date(2020, 1, 1), reference_date())
         self.assertEqual(Decimal(retrieved['avg_annual_cost']), annual_average(Decimal('5678.90'), age))
         with get_connection() as connection:
-            for column, invalid in [('repair_events', '-1'), ('total_historical_cost', '-1'), ('in_service_date', reference_date().isoformat())]:
+            for column, invalid in [('repair_events', '-1'), ('total_historical_cost', '-1'), ('in_service_date', reference_date().isoformat()), ('device_type', 'Unknown'), ('operating_status','broken'), ('assumed_replacement_cost','-1'), ('expected_useful_life','0')]:
                 with self.assertRaises(psycopg.errors.CheckViolation):
                     with connection.transaction():
                         connection.execute(psycopg.sql.SQL('UPDATE equipment SET {}=%s WHERE equipment_id=%s').format(psycopg.sql.Identifier(column)), (invalid, equipment_id))
@@ -70,6 +75,8 @@ class PostgresTests(unittest.TestCase):
         self.assertEqual(response.json()['prediction']['asset_tag'], self.payload['asset_tag'])
         self.assertGreaterEqual(response.json()['prediction']['predicted_annual_cost'], 0)
         self.assertIn('synthetic', response.json()['limitation'])
+        self.assertEqual(response.json()['prediction']['model_input_category'], 'Getinge SERVOi')
+        self.assertEqual(response.json()['prediction']['assumed_replacement_cost'], 20000)
 
     def test_defaults_and_legacy_snapshots_ignored(self):
         payload = {key: value for key, value in self.payload.items() if key not in ['repair_events', 'total_historical_cost']}

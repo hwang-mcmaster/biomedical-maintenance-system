@@ -53,25 +53,15 @@ function App() {
             </div>
           </section>
           <p role="status" aria-live="polite">{message}</p>
-          <EquipmentForm key={editing?.id || 'new'} device={editing} onSaved={saved} onCancel={() => setEditing(null)} />
+          <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
           <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
             onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
           {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}
         </div>
-<<<<<<< HEAD
-
         <div className="column-right">
           <MaintenanceSchedule maintenanceSchedules={maintenanceSchedules.data || []} loading={maintenanceSchedules.loading} error={maintenanceSchedules.error} />
         </div>
       </div>
-=======
-      </section>
-      <p role="status" aria-live="polite">{message}</p>
-      <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
-      <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
-        onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
-      {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}
->>>>>>> origin/main
     </main>
   )
 }

@@ -80,7 +80,7 @@ def get_equipment_maintenance_schedule(equipment_id):
 
 def sweep_overdue_schedules():
     with get_connection() as connection:
-        connection.execute(
+        cur = connection.execute(
             """
             UPDATE maintenance_schedules
             SET status = 'incomplete', 
@@ -89,7 +89,7 @@ def sweep_overdue_schedules():
               AND scheduled_end_time < CURRENT_TIMESTAMP;
         """
         )
-        updated_count = connection.rowcount
+        updated_count = cur.rowcount
         connection.commit()
         print(f"Sweep complete: {updated_count} past-due equipment maintenance tasks marked 'incomplete'.")
 

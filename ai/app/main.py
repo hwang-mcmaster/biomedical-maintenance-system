@@ -279,16 +279,21 @@ def run_maintenance_schedule_optimizer():
     raw_rows = get_equipment_due_for_maintenance()
     equipment_list = [Equipment(**row) for row in raw_rows]
 
+    if len(equipment_list) == 0:
+        print("No equipment due for maintenance in the next 14 days.")
+        return {"status": "success", "schedule": []}
+    
     # Map the calculated equipment objects into AssetIn objects for the fleet summary
     assetInList: List[AssetIn] = [
         AssetIn(
+            device_type=eq.device_type or "Ventilator",  # Default to "Ventilator" if device_type is None
             asset_tag=eq.asset_tag,
             manufacturer=eq.manufacturer,
             age_years=eq.age_years,
             repair_events=eq.repair_events,
             cumulative_cost_to_date=eq.total_historical_cost,
             assumed_replacement_cost=None,
-            projection_years=5,  # default to 5 years
+            projection_years=5  # default to 5 years
             )
             
         for eq in equipment_list

@@ -65,8 +65,9 @@ def get_equipment_due_for_maintenance():
                 SELECT e.equipment_id AS id, e.asset_tag, e.serial_number, e.manufacturer,
                         e.in_service_date, e.repair_events, e.total_historical_cost FROM equipment e
                 LEFT JOIN maintenance_schedules ms ON e.equipment_id = ms.equipment_id
-                WHERE ms.scheduled_end_time <= CURRENT_TIMESTAMP + INTERVAL '14 days'
-                   OR ms.id IS NULL
+                WHERE (ms.scheduled_end_time <= CURRENT_TIMESTAMP + INTERVAL '14 days'
+                   OR ms.id IS NULL)
+                   AND ms.status NOT IN ('in_progress', 'incomplete', 'completed')
                 ORDER BY e.created_at, e.equipment_id;
             """).fetchall()
 

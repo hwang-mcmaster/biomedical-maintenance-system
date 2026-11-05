@@ -15,12 +15,17 @@ from app.calculations import exact_age, annual_average, reference_date
 
 ID = '49e7403c-a464-44be-bc4c-c1741b53ec11'
 PAYLOAD = dict(asset_tag='TEST-1', serial_number='0000123', manufacturer='Getinge SERVOi',
-               in_service_date='2003-03-03', repair_events=19, total_historical_cost='9678.12')
+               in_service_date='2003-03-03', repair_events=19, total_historical_cost='9678.12',
+               model_number='SERVOi', model_name='SERVOi', device_type='Ventilator',
+               firmware_version='1.0', description='Integration fixture', department='ICU',
+               department_code='001', location='Room 12', status='Operational',
+               replacement_cost='20000.00', expected_useful_life=25)
 PREDICTION = dict(asset_tag='TEST-1', predicted_annual_cost=600, cost_error_range=149.08,
                   repair_rate_per_year=1.5, risk_score=0.8, risk_level='high',
                   cumulative_cost_to_date=1000, projected_cost_next_years=3000,
                   projection_years=5, assumed_replacement_cost=None,
-                  maintenance_to_replacement_ratio=None, warnings=['Example model warning'])
+                  maintenance_to_replacement_ratio=None, warnings=['Example model warning'],
+                  training_repair_rate_min=1.0, training_repair_rate_max=2.0)
 
 
 class EquipmentTests(unittest.TestCase):
@@ -50,7 +55,7 @@ class EquipmentTests(unittest.TestCase):
         device = EquipmentCreate.model_validate(payload)
         self.assertEqual(device.repair_events, 0)
         self.assertEqual(device.total_historical_cost, Decimal('0.00'))
-        self.assertEqual(len(EquipmentCreate.model_fields), 6)
+        self.assertEqual(device.department_code, '001')
 
     def test_calculations_and_zero_age(self):
         # One day rounds to 0.00 years, but division uses the unrounded age.
@@ -81,7 +86,7 @@ class EquipmentTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body['serial_number'], '0000123')
         self.assertEqual(body['calculated_as_of'], reference_date().isoformat())
-        self.assertEqual(set(body), set(PAYLOAD) | {'id', 'calculated_as_of', 'age_years', 'avg_annual_cost'})
+        self.assertEqual(set(body), set(PAYLOAD) | {'id', 'calculated_as_of', 'age_years', 'avg_annual_cost', 'reference_remaining_life_years'})
         age = exact_age(date(2003, 3, 3), reference_date())
         self.assertEqual(Decimal(body['avg_annual_cost']), annual_average(Decimal('9678.12'), age))
         self.assertEqual(self.client.get('/api/equipment').json()[0]['id'], ID)
@@ -132,11 +137,15 @@ class EquipmentTests(unittest.TestCase):
         body = result.json()
         self.assertEqual(body['equipment_id'], ID)
         self.assertEqual(body['risk_score'], 0.8)
+        self.assertEqual(body['repair_rate_percentile'], 0.8)
         self.assertEqual(result.headers['cache-control'], 'no-store')
         self.assertIn('Prioritize', body['recommendation'])
         sent = client.return_value.__enter__.return_value.post.call_args.kwargs['json']
         self.assertEqual(sent['age_years'], float(exact_age(date(2020, 1, 1), reference_date())))
         self.assertNotIn('avg_annual_cost', sent)
+        self.assertEqual(sent['device_type'], 'Ventilator')
+        self.assertEqual(sent['assumed_replacement_cost'], 20000)
+        self.assertEqual(sent['expected_useful_life'], 25)
         self.assertEqual(self.client.post(f'/api/equipment/{ID}/assessment').status_code, 200)
 
     @patch('app.repository.get_equipment')
@@ -166,3 +175,76 @@ class EquipmentTests(unittest.TestCase):
             'Access-Control-Request-Headers': 'content-type',
         })
         self.assertEqual(response.status_code, 200)
+
+
+class AssessmentPresentationTests(unittest.TestCase):
+    @patch('app.assessment.httpx.Client')
+    def test_range_boundaries_and_outliers(self, client):
+        from app.assessment import assess_equipment
+        for repairs, outside in [(10, True), (20, False), (30, False), (40, False), (60, True)]:
+            client.return_value.__enter__.return_value.post.return_value.json.return_value = PREDICTION
+            # Exactly 20 years: elapsed days include leap years.
+            device = Equipment.model_validate(PAYLOAD | {'id': ID, 'in_service_date': '2000-01-01',
+                'calculated_as_of': date(2020, 1, 1), 'repair_events': repairs})
+            result = assess_equipment(device)
+            self.assertEqual(any('outside the observed training range' in w for w in result.prediction.warnings), outside)
+            self.assertFalse(any('device-type field' in w for w in result.prediction.warnings))
+
+    @patch('app.assessment.httpx.Client')
+    def test_projection_uses_returned_annual_cents(self, client):
+        from app.assessment import assess_equipment
+        raw = PREDICTION | {'predicted_annual_cost': 299.50, 'projected_cost_next_years': 1497.51,
+                            'warnings': ['One notice', 'One notice']}
+        client.return_value.__enter__.return_value.post.return_value.json.return_value = raw
+        result = assess_equipment(Equipment.model_validate(PAYLOAD | {'id': ID}))
+        self.assertEqual(result.prediction.projected_cost_next_years, 1497.50)
+        self.assertEqual(result.prediction.warnings.count('One notice'), 1)
+
+    @patch('app.assessment.httpx.Client')
+    def test_missing_range_is_explicit_and_legacy_score_is_preserved(self, client):
+        from app.assessment import assess_equipment
+        raw = {key: value for key, value in PREDICTION.items() if not key.startswith('training_repair_rate_')}
+        raw['risk_score'] = 0
+        client.return_value.__enter__.return_value.post.return_value.json.return_value = raw
+        result = assess_equipment(Equipment.model_validate(PAYLOAD | {'id': ID}))
+        self.assertEqual(result.risk_score, 0)
+        self.assertEqual(result.repair_rate_percentile, 0)
+        self.assertTrue(any('range is unavailable' in w for w in result.prediction.warnings))
+
+
+class OperationalContractTests(unittest.TestCase):
+    def test_enums_and_optional_metadata(self):
+        client = TestClient(app)
+        options = client.get('/api/equipment/options').json()
+        self.assertIn('Ventilator', options['device_types'])
+        self.assertEqual(options['useful_life_unit'], 'years')
+        minimal = {key: PAYLOAD[key] for key in ['asset_tag','serial_number','manufacturer','in_service_date']}
+        device = EquipmentCreate.model_validate(minimal)
+        self.assertIsNone(device.device_type)
+        self.assertIsNone(device.status)
+        self.assertIsNone(device.replacement_cost)
+        self.assertEqual(EquipmentCreate.model_validate(PAYLOAD | {'status': 'under_maintenance'}).status, 'Under Maintenance')
+        self.assertIsNone(EquipmentCreate.model_validate(PAYLOAD | {'model_name': '  '}).model_name)
+        for change in [{'status':'Broken'}, {'device_type':'Unknown'}, {'expected_useful_life':0},
+                       {'expected_useful_life':1.5}, {'replacement_cost':-1}, {'description':'x'*2001}]:
+            self.assertEqual(client.post('/api/equipment', json=PAYLOAD | change).status_code,422)
+
+    @patch('app.repository.get_equipment')
+    @patch('app.assessment.httpx.Client')
+    def test_scope_is_enforced_before_calling_ai(self, client, get):
+        api = TestClient(app)
+        for kind in [None, 'Other', 'Infusion Pump']:
+            get.return_value = PAYLOAD | {'id':ID, 'device_type':kind}
+            result=api.get(f'/api/equipment/{ID}/assessment')
+            self.assertEqual(result.status_code,422)
+        client.assert_not_called()
+
+    def test_reference_life_is_not_model_prediction(self):
+        device=Equipment.model_validate(PAYLOAD | {'id':ID,'in_service_date':'2000-01-01',
+            'calculated_as_of':date(2020,1,1), 'expected_useful_life':25})
+        self.assertEqual(device.reference_remaining_life_years,Decimal('5.00'))
+        self.assertEqual(device.model_copy(update={'expected_useful_life':10}).reference_remaining_life_years,Decimal('0.00'))
+
+
+if __name__ == '__main__':
+    unittest.main()

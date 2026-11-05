@@ -1,8 +1,8 @@
 # Biomedical Maintenance System
 
 React + FastAPI + PostgreSQL equipment management with the team's existing
-AI maintenance-cost service. The dataset has eight displayed columns: six
-entered source fields and two calculated values.
+AI maintenance-cost service. The application now stores equipment identity, location/status and lifecycle
+metadata. The training export retains the original eight lifecycle dataset columns.
 
 ## Data contract
 
@@ -22,11 +22,41 @@ maintains creation/update timestamps. The API also returns `calculated_as_of`,
 the reference date used for its calculated values. These are metadata, not extra
 user-entered dataset fields.
 
-Create/update bodies accept only the six source fields. Requests containing
-age_years, avg_annual_cost, calculated_as_of, or old name/type/location/status
-fields are rejected. Missing repair count or historical cost defaults to zero;
-explicit null or invalid values are rejected. The form starts both at zero and
-also treats a cleared optional count/cost as zero when submitting.
+Create/update requests accept the six lifecycle source fields and optional
+operational metadata. Required fields remain asset_tag, serial_number, manufacturer
+and in_service_date. Repair count and historical cost default to zero. Calculated
+age/annual average, reference remaining life and calculated_as_of are read-only.
+
+## Expanded operational contract
+
+The reviewed data definition is implemented with these documented choices:
+
+| Field | Decision |
+| --- | --- |
+| id | Stable public UUID; maps to existing equipment_id in PostgreSQL |
+| model_number / model_name | Separate optional text fields, max 100 each |
+| device_type | Optional controlled value: Ventilator, Infusion Pump, Patient Monitor, Defibrillator, Other |
+| firmware_version | Optional text, max 50 |
+| description | Optional text, max 2000 |
+| department / department_code | Optional department name (100) and code (30); codes remain text |
+| location | Separate optional physical location/room (200), avoiding ambiguity with department |
+| status | Optional Operational, Under Maintenance or Inactive; unknown stays null |
+| replacement_cost | Optional non-negative CAD amount, maps to assumed_replacement_cost in RDS |
+| expected_useful_life | Optional positive integer reference lifespan in years |
+
+The form loads dropdowns from GET /api/equipment/options, so the API is the source
+of allowed values. Blank optional text is normalized to null, not invented. The
+compact table shows identification/type/department/status; details show all fields.
+A full PUT replaces the editable record: omitted optional metadata is reset to null.
+
+Reference remaining life is max(expected useful life minus unrounded age, 0), shown
+to two decimals. It is explicitly a supplied-life arithmetic reference, not an AI
+remaining-life prediction or a clinical clearance. Zero replacement cost is valid
+recorded data, but a maintenance/replacement ratio requires a positive denominator.
+
+Scheduling tasks, priority, qualifications, durations and technician availability
+remain separate operational requirements; this metadata change does not implement
+the scheduling prototype.
 
 ## Calculations
 
@@ -111,22 +141,18 @@ For an existing RDS database, from backend/:
 .\venv\Scripts\python.exe -m app.migrate
 ```
 
-The runner now applies `database/migrations/002_calculated_metrics.sql` in one
-transaction. It makes old age/annual-cost snapshot columns optional, restores zero
-defaults for repairs/cost, and checks source values/date. It never deletes or
-rewrites existing source data or snapshot values. Application queries ignore the
-old snapshots, so they cannot override calculated results. Legacy equipment fields
-are also preserved as optional columns and are not collected by the app.
+The runner applies migration 002 (calculated metrics) and migration 003 (equipment
+metadata) in one transaction. Migration 003 adds missing optional columns and enum,
+replacement-cost and reference-life checks. Existing columns and records are
+preserved, including prior manual snapshots. It does not add fake type, status,
+location or lifespan values to existing records. Both migrations are re-runnable.
+The historical snapshot-required migration 001 is not rerun.
 
-Migration 002 is re-runnable and works on both the previous dataset schema and a
-fresh source-only schema. It does not rerun historical migration 001, which required
-manual snapshots. A failing constraint rolls the migration back; correct invalid
-source data through a reviewed change before retrying. Migration never runs
-automatically on API startup. It has already been applied to the configured RDS.
-
-For a fresh PostgreSQL database, run `database/equipment.sql` using psql. It creates
-only the six source fields plus UUID/timestamps. The existing shared RDS table
-must not be dropped/recreated to change the application schema.
+The configured RDS has been migrated and the existing record was checked unchanged.
+An unrecognized legacy enum or invalid cost/life value causes rollback; resolve the
+source data explicitly before retrying. Migration does not run on API startup.
+For a fresh database, run database/equipment.sql, then the migration runner if
+needed. Do not drop the shared table to change the application schema.
 
 ## API
 
@@ -134,6 +160,7 @@ must not be dropped/recreated to change the application schema.
 | --- | --- | --- |
 | GET | /api/health | API process responds |
 | GET | /api/ready | Checks database connectivity and source columns |
+| GET | /api/equipment/options | Shared device types, statuses, years and CAD units |
 | GET | /api/equipment | Records with calculated metrics and reference date |
 | GET | /api/equipment/export | Dated training CSV containing all eight dataset columns |
 | GET | /api/equipment/{uuid} | One record, or 404 |
@@ -151,14 +178,24 @@ Example creation body:
 {
   "asset_tag": "CED-DEMO-001",
   "serial_number": "006412",
-  "manufacturer": "Getinge SERVOi",
+  "manufacturer": "Getinge",
+  "model_number": "SERVOi",
+  "model_name": "SERVOi",
+  "device_type": "Ventilator",
+  "department": "ICU",
+  "department_code": "001",
+  "location": "Room 12",
+  "status": "Operational",
+  "replacement_cost": "20000.00",
+  "expected_useful_life": 25,
   "in_service_date": "2003-03-03",
   "repair_events": 19,
   "total_historical_cost": "9678.12"
 }
 ```
 
-The response adds id, calculated_as_of, age_years and avg_annual_cost. A full PUT
+The response adds id, calculated_as_of, age_years, avg_annual_cost and
+reference_remaining_life_years. A full PUT
 requires all four identifying/date fields; omitted repair count/cost reset to the
 agreed zero defaults. Duplicates return 409; invalid input returns 422; missing
 records return 404; database/AI connection failures return 503. Database errors
@@ -178,20 +215,61 @@ numeric value rather than a false zero.
 
 ## AI assessment
 
-Assessment loads saved source fields and calculates unrounded age using the same
-reference date. It sends that age, manufacturer, repair count and historical total
-to the existing AI service with a five-year projection horizon. Historical annual
-average is the training target, not a prediction input. Recommendations are
-transparent low/medium/high engineering-review rules layered on model output.
+Assessment requires a recorded device_type of Ventilator. Missing type and all
+other types return clear 422 responses before the AI call; equipment CRUD supports
+all allowed types. The details screen disables assessment and explains why. For an
+existing record, use Edit to supply its verified type; no automatic type guesses
+were made during migration.
 
-The model remains trained on 24 synthetic ventilators, with manufacturer/model
-family categories Getinge SERVOi and Draeger V500. Unknown labels produce warnings;
-there is no silent category mapping or retraining. This dataset does not include
-device type, so the screen and response ask users to confirm ventilator scope.
-Risk means relative repair intensity, not failure probability or clinical safety.
-MAE is typical validation error, not a confidence interval. Five-year cost is a
-simple annual estimate times five. Results are on demand, not saved to equipment.
-CRUD works when the AI service is offline.
+FastAPI sends manufacturer/model, explicit type, unrounded calculated age, repair
+count, historical cost, optional replacement cost and reference useful life to the
+AI service. The service also enforces ventilator scope and finite numeric inputs.
+Historical annual average remains the training target, not a model input.
+
+The trained cost model and metadata were not changed or retrained. Its existing
+categories are Getinge SERVOi and Draeger V500. An explicit, case-insensitive match
+combines recorded manufacturer with model name/number when appropriate (including
+Draeger/Dräger spelling). Legacy combined labels still work. model_input_category
+reports the selected label in the response and UI. Unknown labels retain the
+model's existing ignored-manufacturer warning rather than being mapped arbitrarily.
+Future retraining can use the dated eight-column export and its recorded vocabulary.
+
+The teammate's replacement-reference dictionary is preserved; currently its costs
+are unconfirmed/null. A supplied replacement cost takes precedence. Zero never
+triggers a substitute assumption and yields no ratio. Confirmed reference fallbacks
+retain their provenance warning. The API maps replacement_cost to the AI client's
+assumed_replacement_cost, avoiding duplicate database columns. Expected useful life
+produces reference arithmetic/context only; reaching it gives a review notice, not
+a predicted failure date or automatic replacement decision.
+
+The existing model estimates annual maintenance cost from synthetic ventilator
+history. Risk means relative repair intensity, not failure probability or clinical
+safety. MAE is typical validation error, not a confidence interval. Cost projections
+remain annual estimate times five. Results are on demand, not saved to equipment.
+CRUD works when the AI service is offline. The prior unresolved merge markers in
+the AI service were resolved by retaining both ratio logic and cent rounding.
+
+### Assessment presentation and range checks
+
+The screen distinguishes recorded historical average cost from model-estimated
+annual cost. `repair_rate_percentile` is the clearer response alias for the legacy
+`risk_score` (both remain 0 to 1); the UI displays it as a percentage. A percentile
+of 0% means below the observed fleet repair rates, not zero failure risk.
+
+The AI prediction response includes training_repair_rate_min/max from the loaded
+model metadata. The backend compares the actual repair rate against these bounds
+at the metadata's six-decimal precision and adds a notice for extrapolation. An
+older AI response without these fields gets an explicit range-unavailable notice.
+No thresholds are hardcoded and no model weights or training data were changed.
+
+Annual cost is rounded to cents first; the projection is that same annual amount
+multiplied by the horizon. Thus CAD $299.50/year over five years displays CAD
+$1,497.50 consistently. This is a presentation policy, not a new forecasting model.
+
+Assessment has explicit not-assessed/loading/complete/error states, Reassess and
+Retry controls, one scope note, and deduplicated neutral informational notices.
+Only actual request errors use error styling. Restart backend and AI service after
+updating to ensure the range metadata is available.
 
 ## Code map
 
@@ -245,8 +323,14 @@ leading-zero identifiers, safe errors and ignoring old snapshot columns.
 
 - RDS timeout: check public-IP security-group access, routing or VPN.
 - Missing configuration or CA: check backend/.env and DB_SSLROOTCERT.
-- Schema mismatch: apply migration 002; readiness never changes the database.
+- Schema mismatch: apply migrations 002 and 003; readiness never changes the database.
 - AI unavailable: start its server on port 8001 with its own environment.
 - Port in use: stop the old server before starting another on that port.
 - A lost save response: refresh inventory before retrying. Unique asset tags and
   serial numbers protect inserts from duplicate identifiers.
+
+The AI response contract/rounding test can be run from ai/ with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s . -p test_prediction.py
+```

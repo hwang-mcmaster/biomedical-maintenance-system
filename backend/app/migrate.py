@@ -3,13 +3,15 @@ from pathlib import Path
 import psycopg
 from .database import get_connection
 
-MIGRATION = Path(__file__).resolve().parents[2] / 'database/migrations/002_calculated_metrics.sql'
+MIGRATION_DIR = Path(__file__).resolve().parents[2] / 'database/migrations'
+MIGRATIONS = [MIGRATION_DIR / name for name in ['002_calculated_metrics.sql', '003_equipment_metadata.sql']]
 
 
 def migrate():
     with get_connection() as connection:
-        connection.execute(MIGRATION.read_text(encoding='utf-8'), prepare=False)
-    print('Calculated-metrics migration committed. Source records and old snapshots preserved.')
+        for migration in MIGRATIONS:
+            connection.execute(migration.read_text(encoding='utf-8'), prepare=False)
+    print('Calculated metrics and equipment metadata migrations committed. Existing records preserved.')
 
 
 if __name__ == '__main__':

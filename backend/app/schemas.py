@@ -116,18 +116,16 @@ class Assessment(BaseModel):
     limitation: str
     prediction: Prediction
 
-<<<<<<< HEAD
-class MaintenanceSchedules(BaseModel):
-    asset_tag: Text50
-    scheduled_start_time: datetime
-    scheduled_end_time: datetime
-    status: Literal['pending', 'in_progress', 'scheduled', 'completed', 'cancelled', "incomplete", "failed"]
-    priority_score: int
-=======
 
     @computed_field
     @property
     def repair_rate_percentile(self) -> float:
         # Keep risk_score for older clients; use the clearer name in new displays.
         return self.risk_score
->>>>>>> origin/main
+
+class MaintenanceSchedules(BaseModel):
+    asset_tag: Text50
+    scheduled_start_time: datetime
+    scheduled_end_time: datetime
+    status: Literal['pending', 'in_progress', 'scheduled', 'completed', 'cancelled', "incomplete", "failed"]
+    priority_score: int

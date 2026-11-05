@@ -122,3 +122,10 @@ class Assessment(BaseModel):
     def repair_rate_percentile(self) -> float:
         # Keep risk_score for older clients; use the clearer name in new displays.
         return self.risk_score
+
+class MaintenanceSchedules(BaseModel):
+    asset_tag: Text50
+    scheduled_start_time: datetime
+    scheduled_end_time: datetime
+    status: Literal['pending', 'in_progress', 'scheduled', 'completed', 'cancelled', "incomplete", "failed"]
+    priority_score: int

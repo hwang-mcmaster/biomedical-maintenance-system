@@ -12,12 +12,22 @@ Endpoints
 The model is trained by app/train.py on synthetic data. The risk level is a
 repair-intensity indicator, NOT a failure probability.
 """
+
+
 import json
-from decimal import Decimal, ROUND_HALF_UP
+import httpx
+from uuid import UUID
 from bisect import bisect_right
 from functools import lru_cache
 from pathlib import Path
+from datetime import date
 from typing import List, Optional, Literal
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from contextlib import asynccontextmanager
+from backend.app.repository import sweep_overdue_schedules, get_equipment_due_for_maintenance, save_optimized_maintenance_schedule
+from .scheduler import optimize_maintenance_schedule
+from backend.app.schemas import Equipment
+from decimal import Decimal, ROUND_HALF_UP
 
 import joblib
 import pandas as pd
@@ -36,8 +46,32 @@ REPLACEMENT_COST_CAD = {
     "Draeger V500": {"cost": None, "source": "to be confirmed", "as_of": None},
 }
 
-app = FastAPI(title="Biomedical Maintenance AI Service")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    sweep_overdue_schedules()  # Check for overdue scheduled maintenance tasks when the app starts
 
+    # Run the nightly job to optimize the maintenance schedule
+    scheduler = AsyncIOScheduler()
+
+    # We can later change this to a cron job that runs at a specific time
+    # scheduler.add_job(run_schedule_optimizer, 
+    #                   'cron', 
+    #                   hour=2,
+    #                   minute=0,
+    #                   args=[
+    #                       fleetSummaryOutObj.predictions
+    #                     ],)
+
+    scheduler.add_job(run_maintenance_schedule_optimizer, 
+                          'interval', 
+                          minutes=60)
+    scheduler.start()
+    
+    yield
+
+    scheduler.shutdown()
+
+app = FastAPI(title="Biomedical Maintenance AI Service", lifespan=lifespan)
 
 # ---------- model loading ----------
 
@@ -96,7 +130,6 @@ class PredictionOut(BaseModel):
     training_repair_rate_min: float
     training_repair_rate_max: float
 
-
 class FleetIn(BaseModel):
     assets: List[AssetIn] = Field(..., min_length=1)
 
@@ -110,6 +143,11 @@ class FleetSummaryOut(BaseModel):
     most_repair_intensive_units: List[PredictionOut]
     predictions: List[PredictionOut]
 
+class MaintenanceScheduleRequest(BaseModel):
+    equipment_id: UUID
+    asset_tag: str
+    risk_level: str
+    projection_years: int
 
 # ---------- prediction logic ----------
 
@@ -212,7 +250,6 @@ def health():
 def predict(asset: AssetIn):
     return predict_one(asset)
 
-
 @app.post("/api/ai/fleet-summary", response_model=FleetSummaryOut)
 def fleet_summary(fleet: FleetIn):
     preds = [predict_one(a) for a in fleet.assets]
@@ -236,3 +273,43 @@ def fleet_summary(fleet: FleetIn):
         most_repair_intensive_units=top,
         predictions=preds,
     )
+
+@app.post("/api/ai/optimize-schedule")
+def run_maintenance_schedule_optimizer():
+    raw_rows = get_equipment_due_for_maintenance()
+    equipment_list = [Equipment(**row) for row in raw_rows]
+
+    # Map the calculated equipment objects into AssetIn objects for the fleet summary
+    assetInList: List[AssetIn] = [
+        AssetIn(
+            asset_tag=eq.asset_tag,
+            manufacturer=eq.manufacturer,
+            age_years=eq.age_years,
+            repair_events=eq.repair_events,
+            cumulative_cost_to_date=eq.total_historical_cost,
+            assumed_replacement_cost=None,
+            projection_years=5,  # default to 5 years
+            )
+            
+        for eq in equipment_list
+    ]
+
+    fleetInObj = FleetIn(assets=assetInList)
+    fleetSummaryOutObj = fleet_summary(fleetInObj)
+    payload: list[MaintenanceScheduleRequest] = []
+
+    # Using the predictions, create a list of MaintenanceScheduleRequest objects for the optimizer
+    for pred in fleetSummaryOutObj.predictions:
+        equipment = next((eq for eq in equipment_list if eq.asset_tag == pred.asset_tag), None)
+        if equipment:
+            payload.append(MaintenanceScheduleRequest(
+                equipment_id=equipment.id,
+                asset_tag=pred.asset_tag,
+                risk_level=pred.risk_level,
+                projection_years=pred.projection_years
+            ))
+
+    optimized_result = optimize_maintenance_schedule(payload)
+    save_optimized_maintenance_schedule(optimized_result)  # Save the optimized schedule to the database
+    print(f"Successfully saved optimized maintenance schedule for {len(optimized_result)} equipment items.")
+    return {"status": "success", "schedule": optimized_result}

@@ -76,6 +76,7 @@ def optimize_maintenance_schedule(predictions: list) -> dict:
 
             final_schedule[asset_tag] = {
                 "equipment_id": equipment_dict[asset_tag]["equipment_id"],
+                "asset_tag": asset_tag,
                 "scheduled_start_time": scheduled_start,
                 "scheduled_end_time": scheduled_end,
                 "status": "scheduled",
@@ -85,6 +86,7 @@ def optimize_maintenance_schedule(predictions: list) -> dict:
         for asset_tag in scheduled_days:
             final_schedule[asset_tag] = {
                 "equipment_id": equipment_dict[asset_tag]["equipment_id"],
+                "asset_tag": asset_tag,
                 "scheduled_start_time": None,
                 "scheduled_end_time": None,
                 "status": "failed",

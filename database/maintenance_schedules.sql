@@ -1,8 +1,9 @@
-CREATE TABLE IF NOT EXISTS maintenance_schedules (
+CREATE TABLE maintenance_schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     equipment_id UUID NOT NULL REFERENCES equipment(equipment_id) ON DELETE CASCADE,
-    
-    -- Time windows
+    asset_tag VARCHAR(50) UNIQUE NOT NULL,
+
+    -- Time windows calculated
     scheduled_start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     scheduled_end_time TIMESTAMP WITH TIME ZONE NOT NULL,
     

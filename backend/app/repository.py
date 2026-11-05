@@ -43,7 +43,7 @@ def delete_equipment(equipment_id):
 def get_maintenance_schedules():
     with get_connection() as connection:
         return connection.execute(
-            '''SELECT scheduled_start_time, scheduled_end_time, status, priority_score
+            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score
                FROM maintenance_schedules'''
         ).fetchall()
 
@@ -61,10 +61,25 @@ def get_equipment_due_for_maintenance():
 def get_equipment_maintenance_schedule(equipment_id):
     with get_connection() as connection:
         return connection.execute(
-            '''SELECT scheduled_start_time, scheduled_end_time, status, priority_score
+            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score
                FROM maintenance_schedules WHERE equipment_id = %s''',
             (equipment_id,)
         ).fetchone()
+
+def sweep_overdue_schedules():
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE maintenance_schedules
+            SET status = 'incomplete', 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE status IN ('pending', 'scheduled')
+              AND scheduled_end_time < CURRENT_TIMESTAMP;
+        """
+        )
+        updated_count = connection.rowcount
+        connection.commit()
+        print(f"Sweep complete: {updated_count} past-due equipment maintenance tasks marked 'incomplete'.")
 
 def save_optimized_maintenance_schedule(optimized_work_orders):
     with get_connection() as connection:
@@ -84,11 +99,12 @@ def save_optimized_maintenance_schedule(optimized_work_orders):
                 connection.execute(
                     """
                         INSERT INTO maintenance_schedules 
-                        (equipment_id, scheduled_start_time, scheduled_end_time, status, priority_score)
-                        VALUES (%s, %s, %s, %s, %s);
+                        (equipment_id, asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score)
+                        VALUES (%s, %s, %s, %s, %s, %s);
                     """,
                     (
                         slot["equipment_id"],
+                        slot["asset_tag"],
                         slot["scheduled_start_time"],
                         slot["scheduled_end_time"],
                         slot["status"],
@@ -97,7 +113,6 @@ def save_optimized_maintenance_schedule(optimized_work_orders):
                 )
 
             connection.commit()
-            print(f"Successfully committed {len(optimized_work_orders)} slots.")
 
         except Exception as e:
             connection.rollback()

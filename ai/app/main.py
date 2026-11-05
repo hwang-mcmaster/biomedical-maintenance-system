@@ -24,7 +24,7 @@ from datetime import date
 from typing import List, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
-from backend.app.repository import list_equipment, get_equipment_due_for_maintenance, save_optimized_maintenance_schedule
+from backend.app.repository import sweep_overdue_schedules, get_equipment_due_for_maintenance, save_optimized_maintenance_schedule
 from .scheduler import optimize_maintenance_schedule
 from backend.app.schemas import Equipment
 
@@ -47,8 +47,9 @@ REPLACEMENT_COST_CAD = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start a job to automatically run maintenance scheduler on app startup
-    # Run the job nightly to optimize the maintenance schedule
+    sweep_overdue_schedules()  # Check for overdue scheduled maintenance tasks when the app starts
+
+    # Run the nightly job to optimize the maintenance schedule
     scheduler = AsyncIOScheduler()
 
     # We can later change this to a cron job that runs at a specific time
@@ -264,4 +265,5 @@ def run_maintenance_schedule_optimizer():
 
     optimized_result = optimize_maintenance_schedule(payload)
     save_optimized_maintenance_schedule(optimized_result)  # Save the optimized schedule to the database
+    print(f"Successfully saved optimized maintenance schedule for {len(optimized_result)} equipment items.")
     return {"status": "success", "schedule": optimized_result}

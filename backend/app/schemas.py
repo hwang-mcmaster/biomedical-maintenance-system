@@ -73,7 +73,8 @@ class Assessment(BaseModel):
     prediction: Prediction
 
 class MaintenanceSchedules(BaseModel):
-    scheduled_start_time: date
-    scheduled_end_time: date
-    status: Literal['pending', 'in_progress', 'completed', 'cancelled', "failed"]
+    asset_tag: Text50
+    scheduled_start_time: datetime
+    scheduled_end_time: datetime
+    status: Literal['pending', 'in_progress', 'scheduled', 'completed', 'cancelled', "incomplete", "failed"]
     priority_score: int

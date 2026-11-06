@@ -11,6 +11,7 @@ Text100 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, 
 Text50 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
 DEVICE_TYPES = ('Ventilator', 'Infusion Pump', 'Patient Monitor', 'Defibrillator', 'Other')
 STATUSES = ('Operational', 'Under Maintenance', 'Inactive')
+SCHEDULED_MAINTENANCE_STATUSES = Literal['pending', 'in_progress', 'scheduled', 'completed', 'cancelled', "incomplete", "failed"]
 OptionalText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 Money = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
@@ -127,5 +128,6 @@ class MaintenanceSchedules(BaseModel):
     asset_tag: Text50
     scheduled_start_time: datetime
     scheduled_end_time: datetime
-    status: Literal['pending', 'in_progress', 'scheduled', 'completed', 'cancelled', "incomplete", "failed"]
+    status: SCHEDULED_MAINTENANCE_STATUSES
+    status_msg: str | None = None
     priority_score: int

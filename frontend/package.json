@@ -12,8 +12,10 @@
     "test:live": "npm run build && node test-live.mjs"
   },
   "dependencies": {
+    "@fullcalendar/react": "^7.1.4",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "temporal-polyfill": "^1.0.8"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

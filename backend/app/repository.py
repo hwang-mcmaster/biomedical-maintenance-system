@@ -55,7 +55,7 @@ def delete_equipment(equipment_id):
 def get_maintenance_schedules():
     with get_connection() as connection:
         return connection.execute(
-            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score
+            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg, priority_score
                FROM maintenance_schedules'''
         ).fetchall()
 
@@ -65,15 +65,31 @@ def get_equipment_due_for_maintenance():
                 SELECT e.equipment_id AS id, e.asset_tag, e.serial_number, e.manufacturer,
                         e.in_service_date, e.repair_events, e.total_historical_cost FROM equipment e
                 LEFT JOIN maintenance_schedules ms ON e.equipment_id = ms.equipment_id
-                WHERE ms.scheduled_end_time <= CURRENT_TIMESTAMP + INTERVAL '14 days'
-                   OR ms.id IS NULL
+                WHERE (
+                    (ms.scheduled_end_time <= CURRENT_TIMESTAMP + INTERVAL '14 days' 
+                    AND ms.equipment_id IS NOT NULL 
+                    AND ms.status IN ('pending', 'scheduled'))
+                    
+                    OR 
+                    
+                    (ms.equipment_id IS NULL 
+                    AND (ms.status IN ('pending', 'scheduled') OR ms.status IS NULL))
+                )
                 ORDER BY e.created_at, e.equipment_id;
             """).fetchall()
 
+def get_maintenance_schedules_from_status(status):
+    with get_connection() as connection:
+        return connection.execute(
+            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg, priority_score
+               FROM maintenance_schedules WHERE status = %s''',
+            (status,)
+        ).fetchall()
+    
 def get_equipment_maintenance_schedule(equipment_id):
     with get_connection() as connection:
         return connection.execute(
-            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score
+            '''SELECT asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg, priority_score
                FROM maintenance_schedules WHERE equipment_id = %s''',
             (equipment_id,)
         ).fetchone()
@@ -84,7 +100,8 @@ def sweep_overdue_schedules():
             """
             UPDATE maintenance_schedules
             SET status = 'incomplete', 
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = CURRENT_TIMESTAMP,
+                status_msg = 'The scheduled service was not completed.'
             WHERE status IN ('pending', 'scheduled')
               AND scheduled_end_time < CURRENT_TIMESTAMP;
         """
@@ -111,8 +128,8 @@ def save_optimized_maintenance_schedule(optimized_work_orders):
                 connection.execute(
                     """
                         INSERT INTO maintenance_schedules 
-                        (equipment_id, asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score)
-                        VALUES (%s, %s, %s, %s, %s, %s);
+                        (equipment_id, asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg, priority_score)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s);
                     """,
                     (
                         slot["equipment_id"],
@@ -120,6 +137,7 @@ def save_optimized_maintenance_schedule(optimized_work_orders):
                         slot["scheduled_start_time"],
                         slot["scheduled_end_time"],
                         slot["status"],
+                        slot["status_msg"],
                         slot["priority_score"],
                     ),
                 )

@@ -25,7 +25,20 @@ li {
 
 }
 
-.upcoming-section {
+.perfect-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid white;
+    color: #ffffff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.upcoming-section,
+.incomplete-section {
     display: flex;
     justify-content: space-between;
     align-items: center;

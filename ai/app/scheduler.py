@@ -80,9 +80,24 @@ def optimize_maintenance_schedule(predictions: list) -> dict:
                 "scheduled_start_time": scheduled_start,
                 "scheduled_end_time": scheduled_end,
                 "status": "scheduled",
+                "status_msg": None,
                 "priority_score": equipment_dict[asset_tag]["projection_years"]  # Using projection_years as a proxy for priority
             }
     else:
+        # Figure out why the scheduling model failed
+        status_str = solver.status_name(status)
+        
+        if status == cp_model.INFEASIBLE:
+            # Hard contradiction exists
+            status_msg = "Equipment Maintenance Scheduler: Conflicting constraints detected (overlapping equipment bookings or impossible technician time windows)."
+        elif status == cp_model.UNKNOWN:
+            status_msg = "Equipment Maintenance Scheduler timed out: The schedule space is too complex to resolve within the allowed time limit."
+        elif status == cp_model.MODEL_INVALID:
+            # Model itself is invalid (i.e constraints)
+            status_msg = "Equipment Maintenance Scheduler failed: Malformed model structure or invalid variable bounds."
+        else:
+            status_msg = f"Equipment Maintenance Scheduler failed with unexpected status: {status_str}"
+            
         for asset_tag in scheduled_days:
             final_schedule[asset_tag] = {
                 "equipment_id": equipment_dict[asset_tag]["equipment_id"],
@@ -90,6 +105,7 @@ def optimize_maintenance_schedule(predictions: list) -> dict:
                 "scheduled_start_time": None,
                 "scheduled_end_time": None,
                 "status": "failed",
+                "status_msg": status_msg,
                 "priority_score": None
             }
 

@@ -1,5 +1,11 @@
 export default function ScheduleEntry({ schedule }) {
-    const { asset_tag, scheduled_start_time, scheduled_end_time, status, priority_score } = schedule;
+    const { asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg, priority_score } = schedule;
+
+    let assetTagColor = ''
+    if (status === "scheduled")
+        assetTagColor = "#99e499";
+    else if (status === "incomplete")
+        assetTagColor = "#ff7070";
 
     function formatDate(dateString) {
         const date = new Date(dateString);
@@ -12,9 +18,10 @@ export default function ScheduleEntry({ schedule }) {
     }
 
     return (
-        <section className="panel schedule-entry">
-            <p style={{ fontWeight: 'bold', margin: 0 }}>{asset_tag}</p>
-            <p style={{ margin: 0 }}>{formatDate(scheduled_start_time)} {formatTime(scheduled_start_time)} - {formatTime(scheduled_end_time)}</p>
+        <section className="panel schedule-entry" style={{ padding: "12px" }}>
+            <p style={{ fontWeight: 'bold', margin: 0, color: assetTagColor }}>{asset_tag}</p>
+            <p>{formatDate(scheduled_start_time)} {formatTime(scheduled_start_time)} - {formatTime(scheduled_end_time)}</p>
+            <p>{status_msg}</p>
         </section>
     )
 }

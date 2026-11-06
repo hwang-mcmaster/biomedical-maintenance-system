@@ -276,6 +276,9 @@ def fleet_summary(fleet: FleetIn):
 
 @app.post("/api/ai/optimize-schedule")
 def run_maintenance_schedule_optimizer():
+    # Sweep the schedule database to check if any events are now incomplete
+    sweep_overdue_schedules()
+
     raw_rows = get_equipment_due_for_maintenance()
     equipment_list = [Equipment(**row) for row in raw_rows]
 

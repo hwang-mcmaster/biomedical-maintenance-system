@@ -11,7 +11,7 @@ from . import repository
 from .assessment import assess_equipment
 from .database import get_connection
 from .calculations import reference_date
-from .schemas import Assessment, Equipment, EquipmentCreate, MaintenanceSchedules, DEVICE_TYPES, STATUSES
+from .schemas import Assessment, Equipment, EquipmentCreate, MaintenanceSchedules, DEVICE_TYPES, STATUSES, SCHEDULED_MAINTENANCE_STATUSES
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title='Biomedical Maintenance API')
@@ -120,15 +120,20 @@ def equipment_assessment(equipment_id: UUID, response: Response):
 
 @app.get('/api/maintenance-schedules', response_model=list[MaintenanceSchedules])
 def maintenance_schedules():
-    # Assessments depend on the latest saved history; do not cache old results.
     schedule = repository.get_maintenance_schedules()
     if schedule is None:
         raise HTTPException(404, 'No maintenance schedules found.')
     return schedule
 
+@app.get('/api/maintenance-schedules/{status}/status', response_model=list[MaintenanceSchedules])
+def maintenance_schedule_from_status(status: SCHEDULED_MAINTENANCE_STATUSES):
+    schedule = repository.get_maintenance_schedules_from_status(status)
+    if schedule is None:
+        raise HTTPException(404, f'No maintenance schedules with status {status} found.')
+    return schedule
+
 @app.get('/api/equipment/{equipment_id}/maintenance-schedule', response_model=MaintenanceSchedules)
 def equipment_maintenance_schedule(equipment_id: UUID, response: Response):
-    # Assessments depend on the latest saved history; do not cache old results.
     schedule = repository.get_equipment_maintenance_schedule(equipment_id)
     if schedule is None:
         raise HTTPException(404, f'Maintenance schedule for equipment not found.')

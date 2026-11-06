@@ -1,5 +1,5 @@
 main {
-    max-width: 1280px;
+    max-width: 1380px;
     margin: 0 auto;
     padding: 48px 24px;
 }
@@ -304,7 +304,7 @@ textarea {
 }
 
 .column-right {
-    flex: 1;
-    justify-items: center;
+    flex: 1.25;
     min-width: 0;
+    justify-items: center;
 }

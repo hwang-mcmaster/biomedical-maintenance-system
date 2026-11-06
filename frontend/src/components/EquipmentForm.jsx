@@ -74,7 +74,7 @@ export default function EquipmentForm({ device, onSaved, onCancel, options, onRe
       <p className="subtitle">Age and historical annual cost are calculated. Useful life is a reference in years, not an AI prediction. Department and physical location are separate.</p>
       {options.loading && <p role="status">Loading equipment choices…</p>}
       {options.error && <p role="alert" className="error">{options.error} <button type="button" onClick={onRetryOptions}>Retry equipment choices</button></p>}
-      <form onSubmit={submit} noValidate>
+      <form id="equipment-form" onSubmit={submit} noValidate>
         <fieldset disabled={saving || options.loading || Boolean(options.error)}>
           <legend className="sr-only">Equipment record</legend>
           {fieldGroups.map((group) => <div className="form-group" key={group}><h3>{group}</h3><div className="form-grid">

@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import repository
+from .scheduling import router as scheduling_router
 from .assessment import assess_equipment
 from .database import get_connection
 from .calculations import reference_date
@@ -15,6 +16,7 @@ from .schemas import Assessment, Equipment, EquipmentCreate, MaintenanceSchedule
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title='Biomedical Maintenance API')
+app.include_router(scheduling_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],

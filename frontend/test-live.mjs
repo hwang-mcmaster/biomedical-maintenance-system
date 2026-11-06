@@ -9,7 +9,7 @@ const tag = `CODEX-UI-${randomUUID().replaceAll('-', '')}`
 const serialNumber = `000${randomUUID().replaceAll('-', '')}`
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost:5173', runScripts: 'outside-only' })
 const w = dom.window
-let savedId, assessedResult
+let savedId, assessedResult, scheduleResult, scheduleInput
 w.fetch = async (url, options = {}) => {
   const controller = new AbortController()
   const abort = () => controller.abort()
@@ -18,6 +18,10 @@ w.fetch = async (url, options = {}) => {
   try {
     const path = new URL(url).pathname
     const response = await fetch(`${api}${path}`, { ...options, signal: controller.signal })
+    if (path === '/api/scheduling/preview' && response.ok) {
+      scheduleInput = JSON.parse(options.body)
+      scheduleResult = await response.clone().json()
+    }
     if (path.endsWith('/assessment')) {
       assert.equal(options.method, 'GET')
       if (response.ok) assessedResult = await response.clone().json()
@@ -42,6 +46,13 @@ async function setInput(key, value) {
   input.dispatchEvent(new w.Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
   await wait()
 }
+async function setInputByLabel(label, value) {
+  const element = w.document.querySelector(`[aria-label="${label}"]`)
+  const prototype = element.tagName === 'SELECT' ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype
+  Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value)
+  element.dispatchEvent(new w.Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
+  await wait()
+}
 const submit = () => w.document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
 try {
   const ready = await fetch(`${api}/api/ready`)
@@ -49,7 +60,7 @@ try {
   const bundle = readdirSync('dist/assets').find(name => name.endsWith('.js'))
   w.eval(readFileSync(`dist/assets/${bundle}`, 'utf8'))
   await until(() => button('Add equipment') && !text().includes('Checking equipment database'), 'initial load')
-  assert.equal(w.document.querySelectorAll('form input').length, 14)
+  assert.equal(w.document.querySelectorAll('#equipment-form input').length, 14)
   for (const [key, value] of Object.entries({
     asset_tag: tag, serial_number: serialNumber, manufacturer: 'Getinge', model_name: 'SERVOi', model_number: 'SERVOi', device_type: 'Ventilator',
     department: 'ICU', department_code: '001', location: 'Room 12', status: 'Operational',
@@ -105,6 +116,34 @@ try {
   assert.equal(updated.avg_annual_cost, (321.09 / age).toFixed(2))
   assert.equal(updated.age_years, age.toFixed(2))
   assert.doesNotMatch(text(), /Repair intensity:/)
+  // Use the generated RDS fixture as the source for a real scheduling preview.
+  await setInputByLabel('Equipment for demo inputs', savedId)
+  button('Load demo scheduling inputs').click(); await wait()
+  w.document.getElementById('scheduling-form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
+  await until(() => text().includes('Schedule preview generated:'), 'real schedule preview')
+  assert.equal(scheduleResult.persisted, false)
+  assert.equal(scheduleResult.assignments.length, 3)
+  assert.equal(scheduleResult.unscheduled.length, 0)
+  for (let i = 0; i < scheduleResult.assignments.length; i++) {
+    const assignment = scheduleResult.assignments[i]
+    assert.equal(assignment.equipment_id, savedId)
+    assert.equal(assignment.asset_tag, tag)
+    assert.equal((Date.parse(assignment.end) - Date.parse(assignment.start)) / 60000, assignment.duration_minutes)
+    const technician = scheduleInput.technicians.find(item => item.id === assignment.technician_id)
+    assert.ok(technician.qualifications.some(skill => skill.toLowerCase() === assignment.required_qualification.toLowerCase()))
+    const format = value => new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value))
+    assert.ok(technician.availability.some(window => format(assignment.start) >= window.start && format(assignment.end) <= window.end))
+    for (const other of scheduleResult.assignments.slice(i + 1)) {
+      if (assignment.technician_id === other.technician_id || assignment.equipment_id === other.equipment_id) {
+        assert.ok(Date.parse(assignment.end) <= Date.parse(other.start) || Date.parse(other.end) <= Date.parse(assignment.start))
+      }
+    }
+    for (const booking of scheduleInput.existing_bookings) {
+      if (booking.technician_id === assignment.technician_id || booking.equipment_id === assignment.equipment_id) {
+        assert.ok(format(assignment.end) <= booking.start || format(assignment.start) >= booking.end)
+      }
+    }
+  }
   // CRUD supports other types; both UI and API must prevent unsupported assessment.
   button('Edit', row()).click(); await wait()
   await setInput('device_type', 'Other')
@@ -117,7 +156,7 @@ try {
   button('Confirm delete', row()).click()
   await until(() => !row(), 'deleted row removed')
   assert.equal((await fetch(`${api}/api/equipment/${savedId}`)).status, 404)
-  console.log('Live frontend flow passed: React → FastAPI → RDS persistence → existing AI prediction → edit → delete.')
+  console.log('Live frontend flow passed: React → FastAPI → RDS persistence → existing AI prediction → scheduling constraints → edit → delete.')
 } finally {
   try {
     const response = await fetch(`${api}/api/equipment`)

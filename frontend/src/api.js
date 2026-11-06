@@ -20,6 +20,8 @@ export async function request(path, options = {}) {
   }
   if (!response.ok) {
     const error = new Error(typeof body.detail === 'string' ? body.detail : 'Please correct the highlighted fields.')
+    error.validationMessages = Array.isArray(body.detail)
+      ? body.detail.map((item) => `${item.loc.filter((part) => part !== 'body').join(' > ')}: ${item.msg}`) : []
     error.fields = Array.isArray(body.detail)
       ? Object.fromEntries(body.detail.map((item) => [item.loc.at(-1), item.msg])) : {}
     throw error

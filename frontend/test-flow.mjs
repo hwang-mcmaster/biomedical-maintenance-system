@@ -73,12 +73,12 @@ const values = { asset_tag: 'TEST-1', serial_number: '0000123', manufacturer: 'G
   location: 'Room 12', status: 'Operational', replacement_cost: '20000.00', expected_useful_life: '25',
   in_service_date: '2003-03-03', repair_events: '19', total_historical_cost: '9678.12' }
 await until(() => text().includes('No equipment found'), 'initial inventory')
-assert.equal(w.document.querySelectorAll('form input').length, 14)
-assert.equal(w.document.querySelectorAll('form select').length, 2)
+assert.equal(w.document.querySelectorAll('#equipment-form input').length, 14)
+assert.equal(w.document.querySelectorAll('#equipment-form select').length, 2)
 for (const key of ['name', 'type', 'assumed_replacement_cost']) assert.equal(w.document.getElementById(key), null)
 submit(); await wait(); assert.equal(posts, 0); assert.match(text(), /This field is required/)
 for (const [key, value] of Object.entries(values)) await setInput(key, value)
-assert.equal(w.document.querySelectorAll('form output').length, 3)
+assert.equal(w.document.querySelectorAll('#equipment-form output').length, 3)
 assert.equal(w.document.getElementById('age_years').tagName, 'OUTPUT')
 assert.equal(w.document.getElementById('avg_annual_cost').tagName, 'OUTPUT')
 assert.equal(w.document.getElementById('avg_annual_cost').textContent, Number(calculated(values).avg_annual_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))

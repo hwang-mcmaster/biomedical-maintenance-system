@@ -3,6 +3,7 @@ import './App.css'
 import { useApi } from './useApi'
 import EquipmentForm from './components/EquipmentForm'
 import EquipmentTable from './components/EquipmentTable'
+import SchedulingPanel from './components/SchedulingPanel'
 import EquipmentDetails from './components/EquipmentDetails'
 import MaintenanceSchedule from './components/Scheduler/MaintenanceSchedule'
 
@@ -38,6 +39,7 @@ function App() {
         <p className="eyebrow">Senior Engineering Project · Equipment & maintenance review</p>
         <h1>Biomedical Maintenance System</h1>
         <p className="subtitle">Manage equipment and review AI-assisted maintenance estimates.</p>
+        <nav className="actions" aria-label="Page sections"><a href="#equipment-heading">Equipment inventory</a><a href="#scheduling-heading">Scheduling prototype</a></nav>
       </header>
       <div className="two-column-layout">
         <div className="column-left">
@@ -58,10 +60,20 @@ function App() {
             onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
           {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}
         </div>
+<<<<<<< Updated upstream
         <div className="column-right">
           <MaintenanceSchedule maintenanceSchedules={maintenanceSchedules.data || []} loading={maintenanceSchedules.loading} error={maintenanceSchedules.error} />
         </div>
       </div>
+=======
+      </section>
+      <p role="status" aria-live="polite">{message}</p>
+      <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
+      <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
+        onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
+      {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}
+      <SchedulingPanel devices={devices} equipmentLoading={equipment.loading} equipmentError={equipment.error} />
+>>>>>>> Stashed changes
     </main>
   )
 }

@@ -15,6 +15,8 @@ repair-intensity indicator, NOT a failure probability.
 
 
 import json
+import logging
+import os
 import httpx
 from uuid import UUID
 from bisect import bisect_right
@@ -46,30 +48,33 @@ REPLACEMENT_COST_CAD = {
     "Draeger V500": {"cost": None, "source": "to be confirmed", "as_of": None},
 }
 
+logger = logging.getLogger("uvicorn.error")
+
+
+def scheduler_enabled():
+    # backend.app.database loads backend/.env without overriding process settings.
+    value = os.getenv("SCHEDULER_ENABLED", "false").strip().lower()
+    if value not in ("true", "false"):
+        raise ValueError("SCHEDULER_ENABLED must be true or false.")
+    return value == "true"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    sweep_overdue_schedules()  # Check for overdue scheduled maintenance tasks when the app starts
+    if not scheduler_enabled():
+        logger.info("Background scheduling disabled: no startup sweep or hourly job. Manual optimization remains available.")
+        yield
+        return
 
-    # Run the nightly job to optimize the maintenance schedule
+    logger.info("Background scheduling enabled: running startup sweep and registering hourly optimization.")
+    sweep_overdue_schedules()
     scheduler = AsyncIOScheduler()
-
-    # We can later change this to a cron job that runs at a specific time
-    # scheduler.add_job(run_schedule_optimizer, 
-    #                   'cron', 
-    #                   hour=2,
-    #                   minute=0,
-    #                   args=[
-    #                       fleetSummaryOutObj.predictions
-    #                     ],)
-
-    scheduler.add_job(run_maintenance_schedule_optimizer, 
-                          'interval', 
-                          minutes=60)
+    scheduler.add_job(run_maintenance_schedule_optimizer, 'interval', minutes=60)
     scheduler.start()
-    
-    yield
-
-    scheduler.shutdown()
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
 
 app = FastAPI(title="Biomedical Maintenance AI Service", lifespan=lifespan)
 

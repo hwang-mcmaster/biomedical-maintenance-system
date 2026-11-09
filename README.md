@@ -133,6 +133,35 @@ AI_SERVICE_URL defaults to http://127.0.0.1:8001. Optional frontend/.env can set
 VITE_API_URL; restart Vite after changing it. Both localhost and 127.0.0.1 frontend
 origins on port 5173 are allowed by CORS.
 
+### Background scheduling switch
+
+The AI service reads `SCHEDULER_ENABLED` from the process environment or
+`backend/.env`, which its database module loads. Process environment values take
+precedence. The setting defaults to `false`; use `true` or `false` and restart the
+AI service after changing it.
+
+With `false` (or no setting), startup performs no overdue-schedule sweep and
+registers no hourly job. Health, predictions and fleet summaries remain available.
+With `true`, startup sweeps overdue schedules and registers optimization every
+60 minutes. Shutdown stops the scheduler only when it was enabled.
+
+This switch controls background work, not database permissions. Manual
+`POST /api/ai/optimize-schedule` still sweeps and saves schedules, and equipment
+CRUD can still write. Use a development database for local write tests. Enable
+background scheduling in only one service process to avoid duplicate jobs.
+
+From the repository root, disable background scheduling explicitly with:
+
+```powershell
+$env:SCHEDULER_ENABLED = "false"
+```
+
+Scheduler lifecycle tests mock database writes and the background scheduler:
+
+```powershell
+ai/.venv/Scripts/python.exe -m unittest discover -s ai -p test_scheduler_lifecycle.py
+```
+
 ## Database setup and migration
 
 For an existing RDS database, from backend/:

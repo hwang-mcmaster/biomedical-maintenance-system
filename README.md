@@ -200,6 +200,7 @@ needed. Do not drop the shared table to change the application schema.
 | GET | /api/maintenance-schedules | Fetches all equipment entries in the maintenance scheduler |
 | GET | /api/ai/optimize-schedule | Triggers the maintenance scheduler to calculate dates for new equipment and 
                                     optimize dates for existing equipment that will be serviced within 14 days |
+| POST | /api/ai/predict | Predicts annual cost and repair intensity for one ventilator; see below |
 
 Example creation body:
 
@@ -230,6 +231,24 @@ agreed zero defaults. Duplicates return 409; invalid input returns 422; missing
 records return 404; database/AI connection failures return 503. Database errors
 log categories without raw credentials. Assessment disables caching and retains
 the old POST route as a deprecated compatibility alias.
+
+### POST /api/ai/predict
+
+Predicts cost and repair intensity for one ventilator. `device_type` is
+required and must be `"Ventilator"`. Unknown fields are rejected with 422.
+
+Request:
+
+```json
+{
+  "device_type": "Ventilator",
+  "manufacturer": "Getinge SERVOi",
+  "age_years": 23.38,
+  "repair_events": 19
+}
+```
+
+Other optional fields are listed in `AssetIn` in `ai/app/main.py`.
 
 ## Training exports
 

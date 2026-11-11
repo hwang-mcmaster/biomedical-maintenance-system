@@ -1,5 +1,5 @@
 export default function ScheduleEntry({ schedule }) {
-    const { asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg, priority_score } = schedule;
+    const { asset_tag, scheduled_start_time, scheduled_end_time, status, status_msg } = schedule;
 
     let assetTagColor = ''
     if (status === "scheduled")

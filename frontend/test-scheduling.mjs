@@ -13,6 +13,7 @@ let calls = 0, releasePreview, fail = false, unassigned = false
 const response = (body, status = 200) => ({ ok: status < 300, status, json: async () => body })
 w.fetch = async (url, options = {}) => {
   const path = new URL(url).pathname
+  if (path.startsWith('/api/workflow/')) return response(path.includes('/equipment/') ? {tasks:[],assignments:[],history:[],events:[]} : [])
   if (path === '/api/scheduling/preview') {
     calls++
     const payload = JSON.parse(options.body)

@@ -89,6 +89,7 @@ class Equipment(EquipmentData):
 
 
 class Prediction(BaseModel):
+    model_version: str = "unreported"
     asset_tag: str | None
     predicted_annual_cost: Annotated[float, Field(ge=0, allow_inf_nan=False)]
     cost_error_range: Annotated[float, Field(ge=0, allow_inf_nan=False)]

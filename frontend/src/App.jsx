@@ -5,11 +5,14 @@ import EquipmentForm from './components/EquipmentForm'
 import EquipmentTable from './components/EquipmentTable'
 import SchedulingPanel from './components/SchedulingPanel'
 import EquipmentDetails from './components/EquipmentDetails'
+import WorkflowPanel from './components/WorkflowPanel'
 import MaintenanceSchedule from './components/Scheduler/MaintenanceSchedule'
 
 function App() {
   const health = useApi('/api/health')
   const [revision, setRevision] = useState(0)
+  const [workflowRevision, setWorkflowRevision] = useState(0)
+  function workflowChanged() { setWorkflowRevision(value => value + 1) }
   const options = useApi('/api/equipment/options', revision)
   const ready = useApi('/api/ready', revision)
   const equipment = useApi('/api/equipment', revision)
@@ -39,7 +42,7 @@ function App() {
         <p className="eyebrow">Senior Engineering Project · Equipment & maintenance review</p>
         <h1>Biomedical Maintenance System</h1>
         <p className="subtitle">Manage equipment and review AI-assisted maintenance estimates.</p>
-        <nav className="actions" aria-label="Page sections"><a href="#equipment-heading">Equipment inventory</a><a href="#scheduling-heading">Scheduling prototype</a></nav>
+        <nav className="actions" aria-label="Page sections"><a href="#equipment-heading">Equipment inventory</a><a href="#workflow-heading">Maintenance workflow</a></nav>
       </header>
       <div className="two-column-layout">
         <div className="column-left">
@@ -58,22 +61,18 @@ function App() {
           <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
           <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
             onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
-          {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}
+          {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} workflowRevision={workflowRevision} onWorkflowChanged={workflowChanged} onClose={() => setSelectedId(null)} />}
         </div>
-<<<<<<< Updated upstream
         <div className="column-right">
-          <MaintenanceSchedule maintenanceSchedules={maintenanceSchedules.data || []} loading={maintenanceSchedules.loading} error={maintenanceSchedules.error} />
+          <details><summary>Legacy automatic maintenance calendar</summary>
+            <MaintenanceSchedule maintenanceSchedules={maintenanceSchedules.data || []} loading={maintenanceSchedules.loading} error={maintenanceSchedules.error} />
+          </details>
         </div>
       </div>
-=======
-      </section>
-      <p role="status" aria-live="polite">{message}</p>
-      <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
-      <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
-        onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
-      {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} onClose={() => setSelectedId(null)} />}
-      <SchedulingPanel devices={devices} equipmentLoading={equipment.loading} equipmentError={equipment.error} />
->>>>>>> Stashed changes
+      <WorkflowPanel revision={workflowRevision} onChanged={workflowChanged} />
+      <details><summary>Advanced manual scheduling preview (unsaved)</summary>
+        <SchedulingPanel devices={devices} equipmentLoading={equipment.loading} equipmentError={equipment.error} />
+      </details>
     </main>
   )
 }

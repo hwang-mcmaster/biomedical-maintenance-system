@@ -1,0 +1,32 @@
+{
+  "as_of": "2026-11-10",
+  "scope": "Synthetic fixed-duration engine benchmark. Excludes DB/AI/network time. No actual completion or clinical outcomes measured.",
+  "scenarios": [
+    {
+      "equipment": 20,
+      "technicians": 5,
+      "runs": 20,
+      "mean_engine_ms": 0.286,
+      "max_engine_ms": 0.484,
+      "scheduled": 20,
+      "unassigned": 0,
+      "independently_checked_conflicts": 0,
+      "high_priority_requested": 4,
+      "high_priority_scheduled": 4,
+      "selected_task_utilization_percent": 50.0
+    },
+    {
+      "equipment": 50,
+      "technicians": 5,
+      "runs": 20,
+      "mean_engine_ms": 0.746,
+      "max_engine_ms": 0.871,
+      "scheduled": 40,
+      "unassigned": 10,
+      "independently_checked_conflicts": 0,
+      "high_priority_requested": 10,
+      "high_priority_scheduled": 10,
+      "selected_task_utilization_percent": 100.0
+    }
+  ]
+}

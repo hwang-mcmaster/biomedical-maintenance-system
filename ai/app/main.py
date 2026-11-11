@@ -15,6 +15,7 @@ repair-intensity indicator, NOT a failure probability.
 
 
 import json
+from hashlib import sha256
 import logging
 import os
 import httpx
@@ -89,6 +90,7 @@ def load_model():
         )
     model = joblib.load(MODEL_FILE)
     meta = json.loads(META_FILE.read_text(encoding="utf-8"))
+    meta["model_version"] = sha256(MODEL_FILE.read_bytes()).hexdigest()[:16]
     return model, meta
 
 
@@ -118,6 +120,7 @@ class AssetIn(BaseModel):
 
 
 class PredictionOut(BaseModel):
+    model_version: str = "unreported"
     asset_tag: Optional[str]
     predicted_annual_cost: float
     cost_error_range: float          # typical error (cross-validated MAE), +/- dollars per year
@@ -224,6 +227,7 @@ def predict_one(asset: AssetIn) -> PredictionOut:
             warnings.append('Recorded expected useful life has been reached. This is a reference threshold, not a predicted failure date.')
 
     return PredictionOut(
+        model_version=meta.get("model_version", "unreported"),
         asset_tag=asset.asset_tag,
         predicted_annual_cost=float(annual_amount),
         cost_error_range=round(meta["selected_mae"], 2),

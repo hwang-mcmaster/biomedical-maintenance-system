@@ -4,14 +4,14 @@ import psycopg
 from .database import get_connection
 
 MIGRATION_DIR = Path(__file__).resolve().parents[2] / 'database/migrations'
-MIGRATIONS = [MIGRATION_DIR / name for name in ['002_calculated_metrics.sql', '003_equipment_metadata.sql']]
+MIGRATIONS = [MIGRATION_DIR / name for name in ['002_calculated_metrics.sql', '003_equipment_metadata.sql', '004_maintenance_workflow.sql']]
 
 
 def migrate():
     with get_connection() as connection:
         for migration in MIGRATIONS:
             connection.execute(migration.read_text(encoding='utf-8'), prepare=False)
-    print('Calculated metrics and equipment metadata migrations committed. Existing records preserved.')
+    print('Equipment and maintenance workflow migrations committed. Existing records preserved.')
 
 
 if __name__ == '__main__':

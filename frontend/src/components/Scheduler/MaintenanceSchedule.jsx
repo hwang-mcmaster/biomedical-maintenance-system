@@ -1,32 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from 'react';
 import "./MaintenanceScheduleCalendar.css";
 import ScheduleEntry from "./ScheduleEntry";
 import Calendar from "./Calendar";
 
 export default function MaintenanceScheduleCalendar({ maintenanceSchedules, loading, error }) {
-    const [scheduledMaintenanceDates, setScheduledMaintenanceDates] = useState([]);
-    const [nearestMaintenanceDates, setNearestMaintenanceDates] = useState([]);
-    const [incompleteMaintenanceDates, setIncompleteMaintenanceDates] = useState([]);
-    const [calendarSelectedAssetTag, setCalendarSelectedAssetTag] = useState("");
-
-    useEffect(() => {
-        if (maintenanceSchedules && maintenanceSchedules.length > 0) {
-            const scheduledDates = maintenanceSchedules.filter((schedule) => schedule.status === "scheduled");
-            setScheduledMaintenanceDates(scheduledDates)
-
-            const upcomingDates = getUpcomingMaintenanceDates(scheduledDates);
-            setNearestMaintenanceDates(upcomingDates);
-
-            const incompleteDates = getIncompleteMaintenanceDates(maintenanceSchedules);
-            setIncompleteMaintenanceDates(incompleteDates);
-        }
-    }, [maintenanceSchedules]);
+    const [now] = useState(() => new Date());
 
     function getUpcomingMaintenanceDates(schedules) {
-        const now = new Date();
 
         // Calculate the cutoff date 7 days from now
-        const nextWeek = new Date();
+        const nextWeek = new Date(now);
         nextWeek.setDate(now.getDate() + 7);
 
         return (schedules
@@ -50,13 +33,15 @@ export default function MaintenanceScheduleCalendar({ maintenanceSchedules, load
         );
     }
 
+    const nearestMaintenanceDates = getUpcomingMaintenanceDates(maintenanceSchedules.filter(s => s.status === "scheduled"));
+    const incompleteMaintenanceDates = getIncompleteMaintenanceDates(maintenanceSchedules);
+
     return (
         <section className="panel" aria-labelledby="maintenance-heading">
-            <h2 className="section-heading panel-heading">Maintenance Schedule</h2>
+            <h2 id="maintenance-heading" className="section-heading panel-heading">Maintenance Schedule</h2>
 
             <Calendar
                 maintenanceSchedules={maintenanceSchedules.filter((schedule) => schedule.status !== "pending") || []}
-                onSelectSchedule={(assetTag) => setCalendarSelectedAssetTag(assetTag)}
             />
 
             {loading && <p>Loading...</p>}

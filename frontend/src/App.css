@@ -14,7 +14,6 @@ h1 {
     margin-bottom: 12px;
 }
 
-<<<<<<< Updated upstream
 h2 {
     font-size: 1.2rem;
     margin-bottom: 12px;
@@ -309,7 +308,6 @@ textarea {
     min-width: 0;
     justify-items: center;
 }
-=======
 textarea { box-sizing: border-box; width: 100%; max-width: 480px; padding: 10px; border: 1px solid #8799ad; border-radius: 5px; font: inherit; resize: vertical; }
 .form-group { margin-bottom: 24px; }
 
@@ -322,4 +320,14 @@ textarea { box-sizing: border-box; width: 100%; max-width: 480px; padding: 10px;
 .schedule-results { margin-top: 24px; }
 caption { text-align: left; font-weight: 650; margin: 12px 0; }
 nav.actions { gap: 20px; }
->>>>>>> Stashed changes
+
+.workflow-table { min-width: 850px !important; }
+.workflow-table td { vertical-align: top; }
+.workflow-table td small { display: block; max-width: 340px; margin-top: 6px; }
+.workflow-form { margin: 24px 0; }
+.workflow-form legend { font-size: 1.1rem; font-weight: bold; margin-bottom: 16px; }
+.workflow-form label { margin: 12px 0; }
+.workflow-form input[type=checkbox] { width: auto; }
+.workflow-form .schedule-window input { width: 170px; }
+summary { cursor: pointer; font-weight: 600; margin: 16px 0; }
+@media(max-width:1000px) { .two-column-layout { display: block; } }

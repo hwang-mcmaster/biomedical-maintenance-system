@@ -382,3 +382,16 @@ The AI response contract/rounding test can be run from ai/ with:
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s . -p test_prediction.py
 ```
+
+## Week 10 saved maintenance workflow
+
+Equipment details can create a maintenance task from a fresh assessment with an
+explained priority, or an explicit manual priority when AI is unavailable. Add
+technicians and dated availability in **Saved maintenance workflow**, generate a
+preview from saved tasks and confirm it to reserve resources. Saved assignments
+survive reloads. Start/complete/cancel actions retain status notes and service history.
+
+Apply migration 004 with the normal backend migration command before using these
+views. See [backend/WORKFLOW.md](backend/WORKFLOW.md) for setup, routes, priority
+policy, concurrency rules, live tests and measurement limits. The legacy automatic
+calendar and advanced unsaved preview remain separate views.

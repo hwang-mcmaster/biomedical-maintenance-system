@@ -39,7 +39,7 @@ def qualification_key(value):
     return ' '.join(value.casefold().split())
 
 
-def generate_schedule(request, equipment):
+def generate_schedule(request, equipment, resource_bookings=()):
     referenced = {task.equipment_id for task in request.tasks} | {booking.equipment_id for booking in request.existing_bookings}
     missing = sorted(str(key) for key in referenced if str(key) not in equipment)
     if missing:
@@ -55,6 +55,13 @@ def generate_schedule(request, equipment):
             raise HTTPException(422, 'Existing bookings already overlap for a technician or equipment item. Correct them before generating a preview.')
         technician_busy[booking.technician_id].append((start, end))
         equipment_busy[booking.equipment_id].append((start, end))
+
+    # Saved workflow bookings carry full timezone-aware intervals, including overnight work.
+    for technician_id, equipment_id, start, end in resource_bookings:
+        if technician_id in technician_busy:
+            technician_busy[technician_id].append((start, end))
+        if equipment_id in equipment_busy:
+            equipment_busy[equipment_id].append((start, end))
 
     assignments, unscheduled = [], []
     for task in sorted(request.tasks, key=lambda item: (PRIORITY_ORDER[item.priority], item.id)):

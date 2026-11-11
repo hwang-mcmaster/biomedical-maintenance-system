@@ -15,6 +15,7 @@ const calculated = (record) => {
 }
 w.fetch = async (url, options = {}) => {
   const path = new URL(url).pathname
+  if (path.startsWith('/api/workflow/')) return response(path.includes('/equipment/') ? {tasks:[],assignments:[],history:[],events:[]} : [])
   if (path.endsWith('/options')) return response({ device_types: ['Ventilator','Infusion Pump','Patient Monitor','Defibrillator','Other'], statuses: ['Operational','Under Maintenance','Inactive'] })
   if (path.endsWith('/assessment')) {
     assert.equal(options.method, 'GET')
@@ -94,7 +95,7 @@ submit(); await until(() => posts === 1, 'POST')
 assert.equal(w.document.querySelector('fieldset').disabled, true)
 submit(); await wait(); assert.equal(posts, 1)
 releaseSave()
-await until(() => w.document.querySelector('tbody'), 'table refresh')
+await until(() => w.document.querySelector('td[data-field=asset_tag]'), 'table refresh')
 assert.match(text(), /Equipment saved/)
 assert.equal(w.document.getElementById('asset_tag').value, '')
 assert.match(w.document.querySelector('tbody').textContent, /0000123/)

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import EquipmentWorkflow from './EquipmentWorkflow'
 import { request } from '../api'
 import { equipmentFields, fieldGroups, displayValue } from '../equipmentFields'
 
@@ -6,7 +7,7 @@ const amount = (value) => value == null ? 'N/A' : Number(value).toLocaleString(u
 const percentile = (value) => new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 }).format(value)
 const scopeNote = 'Prototype trained on synthetic ventilator data. Repair intensity is not failure probability or clinical safety. Expected useful life is a reference, not a model prediction. Recommendations require engineering review.'
 
-export default function EquipmentDetails({ device, onClose }) {
+export default function EquipmentDetails({ device, onClose, workflowRevision = 0, onWorkflowChanged = () => {} }) {
   const [assessment, setAssessment] = useState(null)
   const [loading, setLoading] = useState(false)
   const [attempted, setAttempted] = useState(false)
@@ -62,8 +63,9 @@ export default function EquipmentDetails({ device, onClose }) {
             ? `${prediction.training_repair_rate_min.toFixed(3)} to ${prediction.training_repair_rate_max.toFixed(3)} repairs/year` : 'Unavailable'}</dd></div>
           <div><dt>Estimated cost over {prediction.projection_years} years (annual × {prediction.projection_years})</dt><dd>CAD ${amount(prediction.projected_cost_next_years)}</dd></div>
         </dl>
-        <p className="subtitle">Assessed {new Date(assessment.assessed_at).toLocaleString()}. Results are calculated on demand and are not stored.</p>
+        <p className="subtitle">Assessed {new Date(assessment.assessed_at).toLocaleString()}. This assessment is calculated on demand. Creating a task stores a fresh assessment for traceability.</p>
       </div>}
+      <EquipmentWorkflow device={device} revision={workflowRevision} onChanged={onWorkflowChanged} />
     </section>
   )
 }

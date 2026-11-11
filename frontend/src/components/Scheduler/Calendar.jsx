@@ -1,5 +1,4 @@
 import React from 'react';
-import { useState } from 'react';
 
 import FullCalendar from '@fullcalendar/react';
 import themePlugin from "@fullcalendar/react/themes/forma";
@@ -10,14 +9,10 @@ import '@fullcalendar/react/themes/forma/theme.css';
 import '@fullcalendar/react/themes/forma/palettes/blue.css';
 
 export default function Calendar({ maintenanceSchedules, onSelectSchedule }) {
-    const [mouseHoveredEvent, setMouseHoveredEvent] = useState(null);
-    const [toolTipPosition, setToolTipPosition] = useState({ x: 0, y: 0 })
-
-
     const formattedEvents = maintenanceSchedules.map((item) => {
-        let eventClassName = `${item.status}-event`
 
         return {
+            id: item.asset_tag,
             title: item.asset_tag,
             start: item.scheduled_start_time,
             end: item.scheduled_end_time,
@@ -34,14 +29,8 @@ export default function Calendar({ maintenanceSchedules, onSelectSchedule }) {
     });
 
     const handleEventClick = (clickInfo) => {
-        onSelectSchedule(clickInfo.event.id);
+        onSelectSchedule?.(clickInfo.event.id);
     };
-
-    const handleEventMouseEnter = (mouseEnterInfo) => { };
-
-    const handleEventMouseLeave = () => {
-        setMouseHoveredEvent(null)
-    }
 
     return (
         <div className="calendar-container" style={{ margin: "2rem 0 2rem 0" }}>
@@ -57,8 +46,6 @@ export default function Calendar({ maintenanceSchedules, onSelectSchedule }) {
                 displayEventTime={false}
                 events={formattedEvents}
                 eventClick={handleEventClick}
-                eventMouseEnter={handleEventMouseEnter}
-                eventMouseLeave={handleEventMouseLeave}
                 height="auto"
             />
         </div>

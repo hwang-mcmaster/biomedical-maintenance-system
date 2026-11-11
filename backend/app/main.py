@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import repository
 from .scheduling import router as scheduling_router
+from .workflow import router as workflow_router
 from .assessment import assess_equipment
 from .database import get_connection
 from .calculations import reference_date
@@ -17,6 +18,7 @@ from .schemas import Assessment, Equipment, EquipmentCreate, MaintenanceSchedule
 logger = logging.getLogger(__name__)
 app = FastAPI(title='Biomedical Maintenance API')
 app.include_router(scheduling_router)
+app.include_router(workflow_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
@@ -29,6 +31,12 @@ async def database_exception(request, exc):
     from fastapi.responses import JSONResponse
     # Log the category only: exception text may contain connection details or input.
     logger.error('Database operation failed: %s', type(exc).__name__)
+    if isinstance(exc, psycopg.errors.ExclusionViolation):
+        return JSONResponse(status_code=409, content={'detail': 'Booking conflict. Refresh and generate a new preview.'})
+    if isinstance(exc, psycopg.errors.CheckViolation) and request.url.path.startswith('/api/workflow'):
+        return JSONResponse(status_code=422, content={'detail': 'Invalid maintenance record or assignment. Check qualification, availability and task requirements.'})
+    if isinstance(exc, psycopg.errors.UniqueViolation) and request.url.path.startswith('/api/workflow'):
+        return JSONResponse(status_code=409, content={'detail': 'This task or record is already assigned. Refresh before retrying.'})
     if isinstance(exc, psycopg.errors.UniqueViolation):
         return JSONResponse(status_code=409, content={'detail': 'Asset tag or serial number already exists. Use unique values.'})
     if isinstance(exc, psycopg.errors.ForeignKeyViolation):

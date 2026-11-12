@@ -4,7 +4,7 @@ The small prototype favors correctness over concurrent write throughput.
 from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from uuid import UUID
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
 from psycopg.types.json import Jsonb
 from .database import get_connection
 from . import repository
@@ -113,7 +113,7 @@ def existing_task(c, body):
 
 
 @router.post('/tasks',status_code=201)
-def create_task(body: TaskInput):
+def create_task(body: TaskInput, request: Request):
     # Model calls happen outside the write lock. Version comparison prevents stale saves.
     with get_connection() as c:
         saved=existing_task(c,body)
@@ -135,7 +135,7 @@ def create_task(body: TaskInput):
         q=qualification(c,body.required_qualification)
         task=c.execute('INSERT INTO workflow_tasks(equipment_id,assessment_id,equipment_version,title,duration_minutes,required_qualification,priority,priority_reason,due_date,request_id,request_payload) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id',
           (body.equipment_id,assessment_id,row['updated_at'],body.title,body.duration_minutes,q,priority,reason,due,body.request_id,Jsonb(body.model_dump(mode='json',exclude={'request_id'})))).fetchone()
-        c.execute("INSERT INTO workflow_events(task_id,to_status,note) VALUES (%s,'pending',%s)",(task['id'],reason))
+        c.execute("INSERT INTO workflow_events(task_id,to_status,note,actor_id) VALUES (%s,'pending',%s,%s)",(task['id'],reason,request.state.user['id']))
         return next(t for t in task_rows(c,body.equipment_id) if t['id']==task['id'])
 
 
@@ -225,7 +225,7 @@ def schedules():
 
 
 @router.post('/schedules/{schedule_id}/confirm')
-def confirm(schedule_id: UUID):
+def confirm(schedule_id: UUID, request: Request):
     with get_connection() as c:
         lock(c)
         row=required(c.execute('SELECT * FROM workflow_schedules WHERE id=%s FOR UPDATE',(schedule_id,)).fetchone(),'Schedule not found.')
@@ -240,23 +240,27 @@ def confirm(schedule_id: UUID):
             c.execute('INSERT INTO workflow_assignments(schedule_id,task_id,equipment_id,technician_id,starts_at,ends_at) VALUES (%s,%s,%s,%s,%s,%s)',
               (schedule_id,a['task_id'],a['equipment_id'],a['technician_id'],a['start'],a['end']))
             c.execute("UPDATE workflow_tasks SET status='scheduled',updated_at=now() WHERE id=%s",(a['task_id'],))
-            c.execute("INSERT INTO workflow_events(task_id,from_status,to_status,note) VALUES (%s,'pending','scheduled',%s)",(a['task_id'],f'Confirmed schedule {schedule_id}'))
+            c.execute("INSERT INTO workflow_events(task_id,from_status,to_status,note,actor_id) VALUES (%s,'pending','scheduled',%s,%s)",(a['task_id'],f'Confirmed schedule {schedule_id}',request.state.user['id']))
         c.execute("UPDATE workflow_schedules SET status='confirmed',confirmed_at=now() WHERE id=%s",(schedule_id,))
         return {'id':schedule_id,'status':'confirmed','assigned_count':len(result['assignments'])}
 
 
 @router.post('/tasks/{task_id}/status')
-def change_status(task_id: UUID, body: StatusInput):
+def change_status(task_id: UUID, body: StatusInput, request: Request):
     with get_connection() as c:
         lock(c)
         task=required(c.execute('SELECT * FROM workflow_tasks WHERE id=%s FOR UPDATE',(task_id,)).fetchone(),'Task not found.')
+        user=request.state.user
+        if user['role']=='technician':
+            owner=c.execute('SELECT 1 FROM workflow_assignments a JOIN workflow_technicians tech ON tech.id=a.technician_id WHERE a.task_id=%s AND tech.user_id=%s',(task_id,user['id'])).fetchone()
+            if not owner or body.status=='cancelled': raise HTTPException(403,'Technicians may only start or complete their own assigned work.')
         allowed={'pending':{'cancelled'},'scheduled':{'in_progress','cancelled'},'in_progress':{'completed','cancelled'},'completed':set(),'cancelled':set()}
         if body.status not in allowed[task['status']]: raise HTTPException(409,f"Cannot move {task['status']} to {body.status}.")
         assignment=c.execute('SELECT * FROM workflow_assignments WHERE task_id=%s',(task_id,)).fetchone()
         if body.status=='in_progress' and assignment['starts_at']>datetime.now(timezone.utc): raise HTTPException(409,'Cannot start work before its confirmed start time.')
         c.execute('UPDATE workflow_tasks SET status=%s,updated_at=now() WHERE id=%s',(body.status,task_id))
         c.execute('UPDATE workflow_assignments SET status=%s WHERE task_id=%s',(body.status,task_id))
-        c.execute('INSERT INTO workflow_events(task_id,from_status,to_status,note) VALUES (%s,%s,%s,%s)',(task_id,task['status'],body.status,body.notes))
+        c.execute('INSERT INTO workflow_events(task_id,from_status,to_status,note,actor_id) VALUES (%s,%s,%s,%s,%s)',(task_id,task['status'],body.status,body.notes,user['id']))
         if body.status=='completed':
             c.execute('INSERT INTO workflow_history(task_id,equipment_id,notes,actual_cost) VALUES (%s,%s,%s,%s)',(task_id,task['equipment_id'],body.notes,body.actual_cost))
         # Completion records are separate service events. Aggregate training fields are not silently changed.
@@ -270,3 +274,9 @@ def validation_metrics():
         completion=c.execute("SELECT count(*) AS completed, count(*) FILTER(WHERE (h.completed_at AT TIME ZONE 'America/Toronto')::date<=t.due_date) AS completed_within_target FROM workflow_history h JOIN workflow_tasks t ON t.id=h.task_id WHERE t.priority='High'").fetchone()
         return {'tasks':totals,'high_priority_completion':completion,
           'scope':'Recorded task completions only. Scheduling utilization and timing are per-run estimates, not clinical or downtime outcomes.'}
+
+
+@router.get('/my-work')
+def my_work(request: Request):
+    with get_connection() as c:
+        return c.execute('SELECT a.*,t.title,t.priority,t.priority_reason,e.asset_tag FROM workflow_assignments a JOIN workflow_tasks t ON t.id=a.task_id JOIN equipment e ON e.equipment_id=a.equipment_id JOIN workflow_technicians tech ON tech.id=a.technician_id WHERE tech.user_id=%s ORDER BY a.starts_at',(request.state.user['id'],)).fetchall()

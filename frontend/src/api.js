@@ -1,10 +1,14 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+let csrfToken = ''
+export function setCsrfToken(value) { csrfToken = value || '' }
+export const API_URL = import.meta.env.VITE_API_URL || ''
 
 export async function request(path, options = {}) {
   let response
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...options,
+      credentials: 'include',
+      headers: {...options.headers, ...(csrfToken ? {'X-CSRF-Token': csrfToken} : {})},
       signal: options.signal
         ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)])
         : AbortSignal.timeout(20000),
@@ -19,6 +23,7 @@ export async function request(path, options = {}) {
     throw new Error(`The server returned an unreadable response (HTTP ${response.status}).`)
   }
   if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event('session-expired'))
     const error = new Error(typeof body.detail === 'string' ? body.detail : 'Please correct the highlighted fields.')
     error.validationMessages = Array.isArray(body.detail)
       ? body.detail.map((item) => `${item.loc.filter((part) => part !== 'body').join(' > ')}: ${item.msg}`) : []

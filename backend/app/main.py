@@ -7,6 +7,7 @@ import psycopg
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth import router as auth_router, access_control, origins
 from . import repository
 from .scheduling import router as scheduling_router
 from .workflow import router as workflow_router
@@ -19,10 +20,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title='Biomedical Maintenance API')
 app.include_router(scheduling_router)
 app.include_router(workflow_router)
+app.include_router(auth_router)
+app.middleware("http")(access_control)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
-    allow_methods=['GET', 'POST', 'PUT', 'DELETE'], allow_headers=['Content-Type'],
+    allow_origins=sorted(origins()),
+    allow_methods=['GET', 'POST', 'PUT', 'DELETE'], allow_headers=['Content-Type','X-CSRF-Token'], allow_credentials=True,
 )
 
 
@@ -31,6 +34,8 @@ async def database_exception(request, exc):
     from fastapi.responses import JSONResponse
     # Log the category only: exception text may contain connection details or input.
     logger.error('Database operation failed: %s', type(exc).__name__)
+    if isinstance(exc, psycopg.errors.UniqueViolation) and request.url.path.startswith('/api/auth'):
+        return JSONResponse(status_code=409, content={'detail':'Account or technician link already exists.'})
     if isinstance(exc, psycopg.errors.ExclusionViolation):
         return JSONResponse(status_code=409, content={'detail': 'Booking conflict. Refresh and generate a new preview.'})
     if isinstance(exc, psycopg.errors.CheckViolation) and request.url.path.startswith('/api/workflow'):

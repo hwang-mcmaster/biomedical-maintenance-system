@@ -1,79 +1,42 @@
-import { useState } from 'react'
+import {useEffect,useState} from 'react'
 import './App.css'
-import { useApi } from './useApi'
-import EquipmentForm from './components/EquipmentForm'
+import {request,setCsrfToken} from './api'
+import {useApi} from './useApi'
 import EquipmentTable from './components/EquipmentTable'
-import SchedulingPanel from './components/SchedulingPanel'
+import EquipmentForm from './components/EquipmentForm'
 import EquipmentDetails from './components/EquipmentDetails'
 import WorkflowPanel from './components/WorkflowPanel'
+import SchedulingPanel from './components/SchedulingPanel'
 import MaintenanceSchedule from './components/Scheduler/MaintenanceSchedule'
+import {Login,Account,Administration} from './components/AccountPages'
 
-function App() {
-  const health = useApi('/api/health')
-  const [revision, setRevision] = useState(0)
-  const [workflowRevision, setWorkflowRevision] = useState(0)
-  function workflowChanged() { setWorkflowRevision(value => value + 1) }
-  const options = useApi('/api/equipment/options', revision)
-  const ready = useApi('/api/ready', revision)
-  const equipment = useApi('/api/equipment', revision)
-  const maintenanceSchedules = useApi('/api/maintenance-schedules', revision)
-
-  const [editing, setEditing] = useState(null)
-  const [selectedId, setSelectedId] = useState(null)
-  const [message, setMessage] = useState('')
-  const devices = equipment.data || []
-  const selected = devices.find((device) => device.id === selectedId)
-  function refresh() { setRevision((value) => value + 1) }
-  function saved(device, updated) {
-    setMessage(`Equipment ${updated ? 'updated' : 'saved'} (ID ${device.id}). Refreshing the inventory…`)
-    setEditing(null)
-    setSelectedId(null)
-    refresh()
-  }
-  function deleted(device) {
-    setMessage(`Equipment ${device.asset_tag} deleted.`)
-    if (editing?.id === device.id) setEditing(null)
-    if (selectedId === device.id) setSelectedId(null)
-    refresh()
-  }
-  return (
-    <main>
-      <header>
-        <p className="eyebrow">Senior Engineering Project · Equipment & maintenance review</p>
-        <h1>Biomedical Maintenance System</h1>
-        <p className="subtitle">Manage equipment and review AI-assisted maintenance estimates.</p>
-        <nav className="actions" aria-label="Page sections"><a href="#equipment-heading">Equipment inventory</a><a href="#workflow-heading">Maintenance workflow</a></nav>
-      </header>
-      <div className="two-column-layout">
-        <div className="column-left">
-          <section className="panel" aria-labelledby="backend-heading">
-            <h2 id="backend-heading">Connection status</h2>
-            <div role="status" aria-live="polite">
-              {health.loading && <p>Checking the backend connection…</p>}
-              {health.error && <p className="error">Backend unavailable. {health.error}</p>}
-              {health.data && <p><span className="badge">{health.data.status}</span> {health.data.message}</p>}
-              {ready.loading && <p>Checking equipment database…</p>}
-              {ready.error && <p className="error">Database not ready. {ready.error}</p>}
-              {ready.data && !ready.loading && !ready.error && <p>{ready.data.message}</p>}
-            </div>
-          </section>
-          <p role="status" aria-live="polite">{message}</p>
-          <EquipmentForm key={editing?.id || 'new'} device={editing} options={options} onRetryOptions={refresh} onSaved={saved} onCancel={() => setEditing(null)} />
-          <EquipmentTable devices={devices} loading={equipment.loading} error={equipment.error}
-            onRefresh={refresh} onDetails={setSelectedId} onEdit={setEditing} onDeleted={deleted} />
-          {selected && <EquipmentDetails key={JSON.stringify(selected)} device={selected} workflowRevision={workflowRevision} onWorkflowChanged={workflowChanged} onClose={() => setSelectedId(null)} />}
-        </div>
-        <div className="column-right">
-          <details><summary>Legacy automatic maintenance calendar</summary>
-            <MaintenanceSchedule maintenanceSchedules={maintenanceSchedules.data || []} loading={maintenanceSchedules.loading} error={maintenanceSchedules.error} />
-          </details>
-        </div>
-      </div>
-      <WorkflowPanel revision={workflowRevision} onChanged={workflowChanged} />
-      <details><summary>Advanced manual scheduling preview (unsaved)</summary>
-        <SchedulingPanel devices={devices} equipmentLoading={equipment.loading} equipmentError={equipment.error} />
-      </details>
-    </main>
-  )
+function useRoute(){const [route,setRoute]=useState(location.hash.slice(1)||'/overview');useEffect(()=>{const change=()=>setRoute(location.hash.slice(1)||'/overview');window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change)},[]);return route}
+export default function App(){
+ const [user,setUser]=useState(null),[checking,setChecking]=useState(true),[error,setError]=useState('');const route=useRoute()
+ useEffect(()=>{let active=true;request('/api/auth/me').then(r=>{if(active){setUser(r.user);setCsrfToken(r.csrf_token)}}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setChecking(false)})
+ const expired=()=>{setUser(null);setCsrfToken('')};window.addEventListener('session-expired',expired);return()=>{active=false;window.removeEventListener('session-expired',expired)}},[])
+ if(checking)return <p role="status">Checking your session…</p>
+ if(!user)return <>{error.includes('storage')&&<p role="alert">{error}</p>}<Login onLogin={setUser}/></>
+ return <Workspace user={user} route={route} onLogout={()=>{setUser(null);setCsrfToken('')}}/>
 }
-export default App
+function Workspace({user,route,onLogout}){
+ const [rev,setRev]=useState(0),[query,setQuery]=useState(''),[page,setPage]=useState(0),[status,setStatus]=useState(''),[sort,setSort]=useState('asset_tag'),[message,setMessage]=useState(''),[sidebar,setSidebar]=useState(false)
+ const equipment=useApi('/api/equipment',rev),options=useApi('/api/equipment/options',rev),tasks=useApi('/api/workflow/tasks',rev),assignments=useApi('/api/workflow/assignments',rev),mine=useApi('/api/workflow/my-work',rev),legacy=useApi('/api/maintenance-schedules',rev)
+ const writable=user.role!=='technician',admin=user.role==='admin',parts=route.split('?')[0].split('/').filter(Boolean),section=parts[0]||'overview'
+ const labels={overview:'Overview',equipment:'Equipment',tasks:'Maintenance tasks',scheduling:'Scheduling',technicians:'Technicians','my-work':'My work',administration:'Administration',account:'My account',advanced:'Advanced tools'}
+ const refresh=()=>setRev(v=>v+1);const go=path=>{location.hash=path;setSidebar(false)}
+ const selected=equipment.data?.find(d=>d.id===parts[1])
+ const rows=(equipment.data||[]).filter(d=>(!status||d.status===status)&&[d.asset_tag,d.manufacturer,d.serial_number,d.device_type].join(' ').toLowerCase().includes(query.toLowerCase())).sort((a,b)=>String(a[sort]||'').localeCompare(String(b[sort]||'')))
+ async function logout(){try{await request('/api/auth/logout',{method:'POST'});onLogout()}catch(e){setMessage(e.message)}}
+ async function update(a,next){const notes=window.prompt('Work notes (at least 3 characters)');if(!notes)return;let cost='0';if(next==='completed'){cost=window.prompt('Actual cost in CAD','0');if(cost===null)return}try{await request(`/api/workflow/tasks/${a.task_id}/status`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,notes,actual_cost:cost})});refresh()}catch(e){setMessage(e.message)}}
+ return <div className={'service-shell '+(sidebar?'sidebar-open':'')}><aside className="service-sidebar"><a className="brand" href="#/overview">biomed<span>Maintenance workspace</span></a><nav aria-label="Main navigation">{Object.entries(labels).filter(([key])=>key!=='account'&&(!['administration','advanced'].includes(key)||admin)&&(!['tasks','scheduling','technicians'].includes(key)||writable)).map(([key,label])=><a key={key} href={'#/'+key} aria-current={key===section?'page':undefined} onClick={()=>setSidebar(false)}>{label}</a>)}</nav></aside><div className="service-content"><header className="service-topbar"><button className="secondary" aria-label="Toggle navigation" onClick={()=>setSidebar(!sidebar)}>☰</button><strong>{labels[section]||'Page not found'}</strong><div><a href="#/account">{user.name}</a> <small>{user.role}</small> <button className="secondary" onClick={logout}>Sign out</button></div></header><main className="service-main"><p className="breadcrumb"><a href="#/overview">Workspace</a> / {labels[section]}{selected?' / '+selected.asset_tag:''}</p><p role="status">{message}</p>
+ {section==='overview'&&<section className="panel"><h1>Maintenance overview</h1><p>Review equipment and coordinate maintenance from one workspace.</p><div className="overview-stats"><a href="#/equipment"><strong>{equipment.data?.length??'…'}</strong> equipment</a><a href={writable?'#/tasks':'#/my-work'}><strong>{tasks.data?.filter(t=>t.status==='pending').length??'…'}</strong> pending tasks</a><a href={writable?'#/scheduling':'#/my-work'}><strong>{assignments.data?.filter(a=>a.status==='scheduled').length??'…'}</strong> scheduled assignments</a></div>{[equipment,tasks,assignments].filter(x=>x.error).map((x,i)=><p className="error" key={i}>{x.error}</p>)}<p>AI outputs describe relative repair intensity and require engineering review.</p></section>}
+ {section==='equipment'&&(!parts[1]?<><div className="section-heading"><h1>Equipment inventory</h1>{writable&&<button onClick={()=>go('/equipment/new')}>Add equipment</button>}</div><div className="list-toolbar"><label>Search equipment<input value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}} placeholder="Asset tag, serial or manufacturer"/></label><label>Status<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="">All statuses</option>{['Operational','Under Maintenance','Inactive'].map(s=><option key={s}>{s}</option>)}</select></label><label>Sort by<select value={sort} onChange={e=>setSort(e.target.value)}><option value="asset_tag">Asset tag</option><option value="manufacturer">Manufacturer</option><option value="status">Status</option></select></label></div><EquipmentTable devices={rows.slice(page*15,(page+1)*15)} loading={equipment.loading} error={equipment.error} onRefresh={refresh} onDetails={id=>go('/equipment/'+id)} onEdit={d=>go('/equipment/'+d.id+'/edit')} onDeleted={refresh} readOnly={!writable}/><div className="actions"><button disabled={!page} onClick={()=>setPage(page-1)}>Previous</button><span>{rows.length} records. Page {page+1}</span><button disabled={(page+1)*15>=rows.length} onClick={()=>setPage(page+1)}>Next</button></div></>:parts[1]==='new'||parts[2]==='edit'?writable?<EquipmentForm key={parts[1]} device={selected} options={options} onRetryOptions={refresh} onCancel={()=>go('/equipment')} onSaved={d=>{refresh();go('/equipment/'+d.id)}}/>:<p>Coordinator access required.</p>:selected?<EquipmentDetails key={selected.id} device={selected} workflowRevision={rev} onWorkflowChanged={refresh} onClose={()=>go('/equipment')} readOnly={!writable}/>:<p>{equipment.loading?'Loading equipment…':'Equipment not found.'}</p>)}
+ {['tasks','scheduling','technicians'].includes(section)&&(writable?<WorkflowPanel view={section} revision={rev} onChanged={refresh}/>:<p>Coordinator access required.</p>)}
+ {section==='my-work'&&<section className="panel"><h1>My assignments</h1>{mine.error&&<p role="alert">{mine.error}</p>}{mine.loading?<p>Loading assignments…</p>:!mine.data?.length?<p>No assignments linked to your account.</p>:<div className="table-wrapper"><table><thead><tr><th>Equipment / task</th><th>Start</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead><tbody>{mine.data.map(a=><tr key={a.id}><td><a href={'#/equipment/'+a.equipment_id}>{a.asset_tag}</a><br/>{a.title}</td><td>{new Date(a.starts_at).toLocaleString()}</td><td>{a.priority}<small>{a.priority_reason}</small></td><td>{a.status}</td><td>{a.status==='scheduled'&&<button onClick={()=>update(a,'in_progress')}>Start work</button>}{a.status==='in_progress'&&<button onClick={()=>update(a,'completed')}>Complete work</button>}</td></tr>)}</tbody></table></div>}</section>}
+ {section==='administration'&&(admin?<Administration/>:<p>Administrator access required.</p>)}
+ {section==='account'&&<Account onLogout={onLogout}/>}
+ {section==='advanced'&&admin&&<><h1>Advanced tools</h1><SchedulingPanel devices={equipment.data||[]} equipmentLoading={equipment.loading} equipmentError={equipment.error}/><MaintenanceSchedule maintenanceSchedules={legacy.data||[]} loading={legacy.loading} error={legacy.error}/></>}
+ {!labels[section]&&<p>Page not found. Choose a section from the sidebar.</p>}
+ </main></div></div>
+}

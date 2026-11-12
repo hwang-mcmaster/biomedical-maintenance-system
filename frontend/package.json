@@ -8,9 +8,10 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "npm run build && node test-flow.mjs && node test-scheduling.mjs",
+    "test": "npm run build && node test-auth-pages.mjs",
     "test:live": "npm run build && node test-live.mjs",
-    "test:workflow:live": "npm run build && node test-workflow-live.mjs"
+    "test:workflow:live": "npm run build && node test-workflow-live.mjs",
+    "test:legacy": "node test-flow.mjs && node test-scheduling.mjs"
   },
   "dependencies": {
     "@fullcalendar/react": "^7.1.4",

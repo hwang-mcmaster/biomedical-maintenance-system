@@ -3,7 +3,7 @@ import {useApi} from '../useApi'
 import {useMutation,nextTorontoDay,torontoTime} from './workflowHelpers'
 import MutationStatus from './MutationStatus'
 
-export default function WorkflowPanel({revision,onChanged}) {
+export default function WorkflowPanel({revision,onChanged,view='full'}) {
   const techs=useApi('/api/workflow/technicians',revision),tasks=useApi('/api/workflow/tasks',revision)
   const assignments=useApi('/api/workflow/assignments',revision),schedules=useApi('/api/workflow/schedules',revision)
   const metrics=useApi('/api/workflow/metrics',revision)
@@ -28,7 +28,7 @@ export default function WorkflowPanel({revision,onChanged}) {
     {[techs,tasks,assignments,schedules].some(s=>s.loading)&&<p role="status">Loading saved maintenance data…</p>}
     {[...new Set([techs,tasks,assignments,schedules].map(s=>s.error).filter(Boolean))].map(e=><p key={e} role="alert" className="error">{e}</p>)}
     <MutationStatus action={action}/>
-    <h3>Technicians</h3>
+    {['full','technicians'].includes(view)&&<div><h3>Technicians</h3>
     <ul>{techs.data?.map(t=><li key={t.id}><strong>{t.name}</strong>: {t.qualifications.join(', ')}. {t.availability.map(w=>`${w.date} ${w.start}–${w.end}`).join('; ') || 'No availability'} <button type="button" className="secondary" disabled={action.busy} onClick={()=>edit(t)}>Edit {t.name}</button></li>)}</ul>
     <form id="technician-form" className="workflow-form" onSubmit={saveTech}><fieldset disabled={action.busy}>
       <legend>{editTech?'Edit technician':'Add technician'}</legend><div className="form-grid">
@@ -38,7 +38,7 @@ export default function WorkflowPanel({revision,onChanged}) {
       {windows.map((w,i)=><div className="schedule-window" key={i}>{['date','start','end'].map(k=><label key={k}>Availability {k}<input type={k==='date'?'date':'time'} required value={w[k]} onChange={e=>setWindows(windows.map((old,j)=>j===i?{...old,[k]:e.target.value}:old))}/></label>)}<button type="button" className="secondary" onClick={()=>setWindows(windows.filter((_,j)=>j!==i))}>Remove window {i+1}</button></div>)}
       <div className="actions"><button type="button" className="secondary" onClick={()=>setWindows([...windows,{date:day,start:'09:00',end:'17:00'}])}>Add availability window</button><button disabled={action.busy}>{editTech?'Save technician changes':'Save technician'}</button>{editTech&&<button type="button" className="secondary" onClick={reset}>Cancel technician edit</button>}</div>
     </fieldset></form>
-    <h3>Maintenance tasks</h3><p>Choose tasks below, or leave them unchecked to schedule all pending tasks (up to 100).</p>
+    </div>}{['full','tasks'].includes(view)&&<div><h3>Maintenance tasks</h3><p>Choose tasks below, or leave them unchecked to schedule all pending tasks (up to 100).</p>
     <div className="table-wrapper"><table className="workflow-table"><caption>Saved maintenance tasks</caption><thead><tr><th>Select</th><th>Equipment / task</th><th>Priority and reason</th><th>Requirements</th><th>Status / action</th></tr></thead><tbody>{tasks.data?.map(t=><tr key={t.id}>
       <td>{t.status==='pending'&&<input type="checkbox" aria-label={`Schedule ${t.title} for ${t.asset_tag}`} checked={selected.includes(t.id)} onChange={e=>{setPreview(null);setSelected(e.target.checked?[...selected,t.id]:selected.filter(id=>id!==t.id))}}/>}</td>
       <td>{t.asset_tag}<br/>{t.title}</td><td>{t.priority}<small>{t.priority_reason}</small><small>Target: {t.due_date}</small></td><td>{t.duration_minutes} min<br/>{t.required_qualification}</td><td>{t.status}<div className="actions">
@@ -47,7 +47,7 @@ export default function WorkflowPanel({revision,onChanged}) {
         {!['completed','cancelled'].includes(t.status)&&<button type="button" className="secondary" disabled={action.busy} onClick={()=>setStatusTask({...t,next:'cancelled'})}>Cancel task</button>}</div></td>
     </tr>)}</tbody></table></div>
     {statusTask&&<form id="task-status-form" className="workflow-form" onSubmit={status}><fieldset disabled={action.busy}><legend>{statusTask.title}: {statusTask.next}</legend><label>Status notes<textarea name="notes" required minLength={3} maxLength={2000}/></label>{statusTask.next==='completed'&&<label>Actual maintenance cost (CAD)<input name="cost" type="number" required min="0" step="0.01" defaultValue="0"/></label>}<div className="actions"><button disabled={action.busy}>Save task status</button><button type="button" className="secondary" onClick={()=>setStatusTask(null)}>Close status form</button></div></fieldset></form>}
-    <form id="saved-schedule-form" className="workflow-form" onSubmit={generate}><fieldset disabled={action.busy||unavailable}><legend>Generate from saved records</legend><label>Planning date (Toronto)<input type="date" required value={day} onChange={e=>{setDay(e.target.value);setPreview(null)}}/></label><button disabled={action.busy||unavailable||!pending.length}>Generate saved schedule preview</button></fieldset></form>
+    </div>}{['full','scheduling'].includes(view)&&<div><form id="saved-schedule-form" className="workflow-form" onSubmit={generate}><fieldset disabled={action.busy||unavailable}><legend>Generate from saved records</legend><label>Planning date (Toronto)<input type="date" required value={day} onChange={e=>{setDay(e.target.value);setPreview(null)}}/></label><button disabled={action.busy||unavailable||!pending.length}>Generate saved schedule preview</button></fieldset></form>
     {preview&&<div className="schedule-results"><h3>Schedule review</h3><p>{preview.assignments.length} scheduled, {preview.unscheduled.length} unassigned. Draft ID: {preview.id}</p>
       <div className="table-wrapper"><table className="workflow-table"><caption>Proposed assignments</caption><thead><tr><th>Task / equipment</th><th>Technician</th><th>Toronto time</th><th>Priority explanation</th></tr></thead><tbody>{preview.assignments.map(a=><tr key={a.task_id}><td>{a.title}<br/>{a.asset_tag}</td><td>{a.technician_name}</td><td>{torontoTime(a.start)}<br/>{torontoTime(a.end)}</td><td>{a.priority}<small>{a.priority_reason}</small><small>{a.within_target?'Within':'After'} review target: {a.due_date}</small></td></tr>)}</tbody></table></div>
       <ul>{preview.unscheduled.map(t=><li key={t.task_id}>{t.asset_tag}: {t.title}. {t.reason}</li>)}</ul>
@@ -58,5 +58,6 @@ export default function WorkflowPanel({revision,onChanged}) {
     <h3>Confirmed maintenance assignments</h3><div className="table-wrapper"><table className="workflow-table"><caption>Upcoming work and assignment history</caption><thead><tr><th>Equipment / task</th><th>Technician</th><th>Toronto time</th><th>Status</th><th>Priority</th></tr></thead><tbody>{assignments.data?.map(a=><tr key={a.id}><td>{a.asset_tag}<br/>{a.title}</td><td>{a.technician_name}</td><td>{torontoTime(a.starts_at)}<br/>{torontoTime(a.ends_at)}</td><td>{a.status}</td><td>{a.priority}<small>{a.priority_reason}</small></td></tr>)}</tbody></table></div>
     {metrics.data?.high_priority_completion && <p>Recorded high-priority work completed within its review target: {metrics.data.high_priority_completion.completed_within_target}/{metrics.data.high_priority_completion.completed}. Completion results come from recorded work, not generated schedules.</p>}
     <details><summary>Saved schedule runs and measurements</summary><ul>{schedules.data?.map(s=><li key={s.id}>{s.schedule_date}, {s.status}: {s.result.metrics?.scheduled_count} assignments in {s.result.metrics?.computation_ms} ms. {s.status==='draft'&&<button type="button" className="secondary" onClick={()=>setPreview({...s.result,id:s.id})}>Review saved draft</button>}</li>)}</ul></details>
+    </div>}
   </section>
 }

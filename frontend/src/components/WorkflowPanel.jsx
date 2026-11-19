@@ -29,7 +29,7 @@ export default function WorkflowPanel({revision,onChanged,view='full'}) {
     {[...new Set([techs,tasks,assignments,schedules].map(s=>s.error).filter(Boolean))].map(e=><p key={e} role="alert" className="error">{e}</p>)}
     <MutationStatus action={action}/>
     {['full','technicians'].includes(view)&&<div><h3>Technicians</h3>
-    <ul>{techs.data?.map(t=><li key={t.id}><strong>{t.name}</strong>: {t.qualifications.join(', ')}. {t.availability.map(w=>`${w.date} ${w.start}–${w.end}`).join('; ') || 'No availability'} <button type="button" className="secondary" disabled={action.busy} onClick={()=>edit(t)}>Edit {t.name}</button></li>)}</ul>
+    <ul className="technician-list">{techs.data?.map(t=><li key={t.id}><strong>{t.name}</strong>: {t.qualifications.join(', ')}. {t.availability.map(w=>`${w.date} ${w.start}–${w.end}`).join('; ') || 'No availability'} <button type="button" className="secondary" disabled={action.busy} onClick={()=>edit(t)}>Edit {t.name}</button></li>)}</ul>
     <form id="technician-form" className="workflow-form" onSubmit={saveTech}><fieldset disabled={action.busy}>
       <legend>{editTech?'Edit technician':'Add technician'}</legend><div className="form-grid">
         <label>Technician name<input required maxLength={100} value={techName} onChange={e=>setTechName(e.target.value)}/></label>

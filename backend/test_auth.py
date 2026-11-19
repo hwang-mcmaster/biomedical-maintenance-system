@@ -34,10 +34,10 @@ class AuthTests(unittest.TestCase):
  def test_login_origin(self):
   self.assertEqual(TestClient(app).post('/api/auth/login',json={'email':'a@b.c','password':'x'}).status_code,403)
  def test_password_hash(self):
-  value='fixture-long-passphrase-0198';encoded=password(value)
+  value='fixture-pass-0198';encoded=password(value)
   self.assertNotIn(value,encoded);self.assertTrue(verify(encoded,value));self.assertFalse(verify(encoded,'wrong'))
   self.assertEqual(len(digest(value)),64)
-  with self.assertRaises(HTTPException): password('short')
+  with self.assertRaises(HTTPException): password('tiny')
  def test_technician_ownership(self):
   from app.workflow import change_status
   from app.workflow_schemas import StatusInput
@@ -58,11 +58,11 @@ class AuthTests(unittest.TestCase):
    self.assertIn('DELETE FROM auth_sessions',sql)
 
  def test_login_issues_secure_opaque_cookie(self):
-  user=USER|{'password_hash':password('fixture-long-password-2026')}
+  user=USER|{'password_hash':password('fixture-pass-2026')}
   with patch('app.auth.get_connection') as connect:
    c=connect.return_value.__enter__.return_value
    c.execute.return_value.fetchone.side_effect=[{'failures':0},{'failures':0},user]
-   r=TestClient(app).post('/api/auth/login',json={'email':user['email'],'password':'fixture-long-password-2026'},headers={'Origin':'http://localhost:5173'})
+   r=TestClient(app).post('/api/auth/login',json={'email':user['email'],'password':'fixture-pass-2026'},headers={'Origin':'http://localhost:5173'})
    self.assertEqual(r.status_code,200,r.text)
    self.assertIn('HttpOnly',r.headers['set-cookie']);self.assertIn('Secure',r.headers['set-cookie'])
    self.assertIn('SameSite=lax',r.headers['set-cookie'])
@@ -87,5 +87,19 @@ class AuthTests(unittest.TestCase):
  def test_expired_activation_rejected(self):
   with patch('app.auth.get_connection') as connect:
    connect.return_value.__enter__.return_value.execute.return_value.fetchone.return_value=None
-   r=TestClient(app).post('/api/auth/activate',json={'token':'x'*32,'password':'fixture-long-password'},headers={'Origin':'http://localhost:5173'})
+   r=TestClient(app).post('/api/auth/activate',json={'token':'x'*32,'password':'fixture-pass-2026'},headers={'Origin':'http://localhost:5173'})
    self.assertEqual(r.status_code,400)
+
+ def test_temporary_password_length_boundaries(self):
+  from pydantic import ValidationError
+  from app.auth import Activate,Change,Login
+  for value in ['aB7!x','aB7!'+('x'*16)]:
+   self.assertTrue(verify(password(value),value))
+   Activate(token='x'*32,password=value)
+   Change(current_password='old password',new_password=value)
+  for value in ['1234','x'*21]:
+   with self.assertRaises(HTTPException): password(value)
+   with self.assertRaises(ValidationError): Activate(token='x'*32,password=value)
+   with self.assertRaises(ValidationError): Change(current_password='old password',new_password=value)
+  # Existing longer passwords must still work at sign-in and password verification.
+  Login(email='fixture@example.test',password='x'*100)

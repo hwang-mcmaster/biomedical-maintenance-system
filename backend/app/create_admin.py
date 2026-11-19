@@ -6,7 +6,7 @@ from .database import get_connection
 def main():
     email=input('Administrator email: ').strip().casefold();name=input('Name: ').strip()
     if '@' not in email or not name: raise SystemExit('A valid email and name are required.')
-    value=getpass('Password (15+ characters): ')
+    value=getpass('Password (5–20 characters): ')
     if value!=getpass('Confirm password: '): raise SystemExit('Passwords differ.')
     encoded=password(value)
     with get_connection() as c:

@@ -40,7 +40,10 @@ Install backend requirements, then run from backend:
     venv/Scripts/python.exe -m app.create_admin
 
 This prompts for administrator email/name/password without storing credentials in
-source. It refuses to bootstrap over an existing active administrator.
+source. New passwords currently use the requested temporary 5–20 character limit.
+Existing longer passwords remain accepted at sign-in; changing/resetting them uses
+the new limit. Email is a unique login identifier and need not be a deliverable
+inbox while activation/reset links are distributed manually. It refuses to bootstrap over an existing active administrator.
 
 For local HTTP set AUTH_COOKIE_SECURE=false in backend/.env. In deployment use
 HTTPS and AUTH_COOKIE_SECURE=true. Configure APP_ORIGINS as the exact comma-separated
@@ -111,3 +114,11 @@ live scripts require conversion to authenticated fixtures before use; they are
 not proof of the new account flow. No live-auth pass is claimed before migration.
 The workspace still uses existing small-fleet list APIs for data loading; table
 pagination is client-side. Server-side paging is a later scalability improvement.
+
+## Frontend-only development preview
+
+Start only Vite, then open http://localhost:5173/?preview=1#/overview . This
+uses sample data without requesting the backend. Mutation requests are rejected
+locally. The prominent preview banner distinguishes this from an authenticated
+session. The switch only exists when import.meta.env.DEV is true; production
+builds ignore the preview query and still require real authentication.

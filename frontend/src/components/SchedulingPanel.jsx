@@ -116,8 +116,9 @@ export default function SchedulingPanel({ devices, equipmentLoading, equipmentEr
           <div className="actions"><button type="button" className="secondary" disabled={!devices.length} onClick={loadDemo}>Load demo scheduling inputs</button>
             <button type="button" className="secondary" onClick={() => { setTasks([]); setTechnicians([]); setBookings([]); setDemo(false); invalidate() }}>Clear scheduling inputs</button></div>
           {demo && <p className="notice">Demo task/technician data loaded. Equipment references are real saved records; names, qualifications, durations and availability are demonstration inputs.</p>}
-          <h3>Technicians and availability</h3>
-          <button type="button" className="secondary" onClick={addTechnician} disabled={technicians.length >= 30}>Add technician</button>
+          <section className="schedule-input-section" aria-labelledby="schedule-technicians-heading">
+          <div className="schedule-input-heading"><h3 id="schedule-technicians-heading">Technicians and availability</h3>
+          <button type="button" className="secondary" onClick={addTechnician} disabled={technicians.length >= 30}>Add technician</button></div>
           {technicians.map((tech, index) => <div className="schedule-card" key={tech.id}>
             <h4>Technician {index + 1} · {tech.id}</h4>
             <div className="form-grid">
@@ -132,8 +133,10 @@ export default function SchedulingPanel({ devices, equipmentLoading, equipmentEr
             <div className="actions"><button type="button" className="secondary" disabled={tech.availability.length >= 10} onClick={() => update(setTechnicians, tech.id, { availability: [...tech.availability, { start: '09:00', end: '17:00' }] })}>Add availability window</button>
               <button type="button" className="secondary" onClick={() => { remove(setTechnicians, tech.id); setBookings(previous => previous.filter(booking => booking.technician_id !== tech.id)) }}>Remove technician</button></div>
           </div>)}
-          <h3>Maintenance tasks</h3>
-          <button type="button" className="secondary" onClick={addTask} disabled={!devices.length || tasks.length >= 100}>Add maintenance task</button>
+          </section>
+          <section className="schedule-input-section" aria-labelledby="schedule-tasks-heading">
+          <div className="schedule-input-heading"><h3 id="schedule-tasks-heading">Maintenance tasks</h3>
+          <button type="button" className="secondary" onClick={addTask} disabled={!devices.length || tasks.length >= 100}>Add maintenance task</button></div>
           {tasks.map((task, index) => <div className="schedule-card" key={task.id}>
             <h4>Task {index + 1} · {task.id}</h4><div className="form-grid">
               {equipmentSelect(`Task ${index + 1} equipment`, task.equipment_id, equipment_id => update(setTasks, task.id, { equipment_id, required_qualification: devices.find(device => device.id === equipment_id)?.device_type || 'General' }))}
@@ -143,16 +146,19 @@ export default function SchedulingPanel({ devices, equipmentLoading, equipmentEr
               {input(`Task ${index + 1} duration (minutes)`, task.duration_minutes, duration_minutes => update(setTasks, task.id, { duration_minutes }), 'number', { min: 1, max: 1440, step: 1 })}
             </div><button type="button" className="secondary" onClick={() => remove(setTasks, task.id)}>Remove task</button>
           </div>)}
-          <h3>Existing bookings to avoid</h3>
+          </section>
+          <section className="schedule-input-section" aria-labelledby="schedule-bookings-heading">
+          <div className="schedule-input-heading"><h3 id="schedule-bookings-heading">Existing bookings to avoid</h3>
+          <button type="button" className="secondary" disabled={!technicians.length || !devices.length || bookings.length >= 200} onClick={() => { invalidate(); setBookings(previous => [...previous, { id: identifier('booking'), equipment_id: devices[0].id, technician_id: technicians[0].id, start: '09:00', end: '10:00' }]) }}>Add existing booking</button></div>
           <p className="subtitle">Enter known bookings for this day. The prototype has no saved booking database.</p>
-          <button type="button" className="secondary" disabled={!technicians.length || !devices.length || bookings.length >= 200} onClick={() => { invalidate(); setBookings(previous => [...previous, { id: identifier('booking'), equipment_id: devices[0].id, technician_id: technicians[0].id, start: '09:00', end: '10:00' }]) }}>Add existing booking</button>
           {bookings.map((booking, index) => <div className="schedule-card" key={booking.id}><div className="form-grid">
             {equipmentSelect(`Booking ${index + 1} equipment`, booking.equipment_id, equipment_id => update(setBookings, booking.id, { equipment_id }))}
             <label className="schedule-field">Booking {index + 1} technician<select aria-label={`Booking ${index + 1} technician`} value={booking.technician_id} onChange={event => update(setBookings, booking.id, { technician_id: event.target.value })}>{technicians.map(tech => <option key={tech.id} value={tech.id}>{tech.name || tech.id}</option>)}</select></label>
             {input(`Booking ${index + 1} start`, booking.start, start => update(setBookings, booking.id, { start }), 'time')}
             {input(`Booking ${index + 1} end`, booking.end, end => update(setBookings, booking.id, { end }), 'time')}
           </div><button type="button" className="secondary" onClick={() => remove(setBookings, booking.id)}>Remove booking</button></div>)}
-          <div className="actions"><button type="submit" disabled={generating || !devices.length}>{generating ? 'Generating…' : 'Generate schedule preview'}</button></div>
+          </section>
+          <div className="actions schedule-submit-actions"><button type="submit" disabled={generating || !devices.length}>{generating ? 'Generating…' : 'Generate schedule preview'}</button></div>
         </fieldset>
         {errors.length > 0 && <div role="alert" className="error"><p>Schedule could not be generated:</p><ul>{errors.map((message, index) => <li key={index}>{message}</li>)}</ul></div>}
       </form>

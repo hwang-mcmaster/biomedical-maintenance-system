@@ -14,6 +14,7 @@ assert.equal(seen.filter(p=>p!=='/api/auth/me').length,0)
 for(const [name,value] of [['email','fixture@example.test'],['password','fixture-long-password']]){const input=w.document.querySelector(`input[name=${name}]`);input.value=value}
 w.document.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));for(let i=0;i<60&&!w.document.querySelector('.service-sidebar');i++)await pause()
 assert.ok(w.document.querySelector('.service-sidebar'))
+assert.equal(w.document.querySelector('.ui-layout-preview'),null,'Authenticated workspace must not enter sample-data mode')
 assert.equal(!!w.document.querySelector('nav a[href="#/administration"]'),role==='admin')
 assert.equal(!!w.document.querySelector('nav a[href="#/scheduling"]'),role!=='technician')
 w.location.hash='/equipment';await pause();assert.match(w.document.body.textContent,/Equipment inventory/)

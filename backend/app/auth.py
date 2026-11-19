@@ -23,7 +23,7 @@ def origins(): return set(os.getenv('APP_ORIGINS','http://localhost:5173,http://
 def check_origin(request):
     if request.headers.get('origin') not in origins(): raise HTTPException(403,'Request origin is not allowed.')
 def password(value):
-    if len(value)<15 or len(value)>128: raise HTTPException(422,'Use a password of 15–128 characters.')
+    if len(value)<5 or len(value)>20: raise HTTPException(422,'Use a password of 5–20 characters.')
     if value.casefold() in {'passwordpassword','123456789012345','changemepassword'}: raise HTTPException(422,'Choose a less common password.')
     return hasher.hash(value)
 def public(user): return {k:user[k] for k in ('id','email','name','role','is_active')}
@@ -76,10 +76,10 @@ class Login(Input):
     password: str=Field(min_length=1,max_length=128)
 class Activate(Input):
     token: str=Field(min_length=20,max_length=200)
-    password: str=Field(min_length=15,max_length=128)
+    password: str=Field(min_length=5,max_length=20)
 class Change(Input):
     current_password: str=Field(max_length=128)
-    new_password: str=Field(min_length=15,max_length=128)
+    new_password: str=Field(min_length=5,max_length=20)
 class UserInput(Input):
     email: str=Field(min_length=3,max_length=254)
     name: str=Field(min_length=1,max_length=100)

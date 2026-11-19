@@ -36,13 +36,13 @@ export default function EquipmentTable({ devices, loading, error, onRefresh, onD
         <caption className="sr-only">Biomedical equipment inventory</caption>
         <thead><tr>{[...inventoryFields.map(({ label }) => label), 'Actions'].map((heading) => <th key={heading} scope="col">{heading}</th>)}</tr></thead>
         <tbody>{devices.map((device) => <tr key={device.id}>
-          {inventoryFields.map(({ key }) => <td key={key} data-field={key}>{displayValue(key, device[key])}</td>)}
+          {inventoryFields.map(({ key }) => <td key={key} data-field={key}>{key === 'status' ? <span className={'status-badge ' + (device.status==='Under Maintenance'?'maintenance':device.status==='Inactive'?'inactive':device.status?'operational':'unknown')}>{displayValue(key, device[key])}</span> : displayValue(key, device[key])}</td>)}
           <td><div className="actions">
             <button type="button" className="secondary" onClick={() => onDetails(device.id)}>Details & assessment</button>
             {!readOnly && <><button type="button" className="secondary" onClick={() => onEdit(device)}>Edit</button>
             {confirmId === device.id ? <>
               <span>Delete {device.asset_tag} permanently?</span>
-              <button type="button" disabled={Boolean(deleting)} onClick={() => remove(device)}>{deleting === device.id ? 'Deleting…' : 'Confirm delete'}</button>
+              <button type="button" className="danger" disabled={Boolean(deleting)} onClick={() => remove(device)}>{deleting === device.id ? 'Deleting…' : 'Confirm delete'}</button>
               <button type="button" className="secondary" disabled={Boolean(deleting)} onClick={() => setConfirmId(null)}>Cancel</button>
             </> : <button type="button" className="secondary" disabled={Boolean(deleting)} onClick={() => { setConfirmId(device.id); setDeleteError('') }}>Delete</button>}
             </>}

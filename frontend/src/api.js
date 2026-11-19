@@ -1,8 +1,10 @@
+import {UI_PREVIEW,previewRequest} from './uiPreview'
 let csrfToken = ''
 export function setCsrfToken(value) { csrfToken = value || '' }
 export const API_URL = import.meta.env.VITE_API_URL || ''
 
 export async function request(path, options = {}) {
+  if (UI_PREVIEW) return previewRequest(path, options)
   let response
   try {
     response = await fetch(`${API_URL}${path}`, {

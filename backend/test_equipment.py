@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import httpx
 import psycopg
-from fastapi.testclient import TestClient
+from auth_test_support import TestClient, setup_identity
 
 from app.main import app
 from app.schemas import Equipment, EquipmentCreate
@@ -30,6 +30,7 @@ PREDICTION = dict(asset_tag='TEST-1', predicted_annual_cost=600, cost_error_rang
 
 class EquipmentTests(unittest.TestCase):
     def setUp(self):
+        setup_identity(self)
         self.client = TestClient(app)
         self.record = PAYLOAD | {'id': ID}
 
@@ -213,6 +214,9 @@ class AssessmentPresentationTests(unittest.TestCase):
 
 
 class OperationalContractTests(unittest.TestCase):
+    def setUp(self):
+        setup_identity(self)
+
     def test_enums_and_optional_metadata(self):
         client = TestClient(app)
         options = client.get('/api/equipment/options').json()

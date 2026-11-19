@@ -2,7 +2,7 @@ import copy
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
-from fastapi.testclient import TestClient
+from auth_test_support import TestClient, setup_identity
 from app.main import app
 
 E1 = '49e7403c-a464-44be-bc4c-c1741b53ec11'
@@ -31,6 +31,7 @@ def instant(value):
 @patch('app.scheduling.repository.list_equipment')
 class SchedulingTests(unittest.TestCase):
     def setUp(self):
+        setup_identity(self)
         self.client = TestClient(app)
 
     def run_preview(self, lookup, payload):

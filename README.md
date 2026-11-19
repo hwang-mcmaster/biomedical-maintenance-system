@@ -1,5 +1,7 @@
 # Biomedical Maintenance System
 
+**Account setup required:** this version requires the manual authentication database tasks and first administrator described in [backend/ACCESS_SETUP.md](backend/ACCESS_SETUP.md). Those changes have not been applied to RDS.
+
 React + FastAPI + PostgreSQL equipment management with the team's existing
 AI maintenance-cost service. The application now stores equipment identity, location/status and lifecycle
 metadata. The training export retains the original eight lifecycle dataset columns.
@@ -395,3 +397,12 @@ Apply migration 004 with the normal backend migration command before using these
 views. See [backend/WORKFLOW.md](backend/WORKFLOW.md) for setup, routes, priority
 policy, concurrency rules, live tests and measurement limits. The legacy automatic
 calendar and advanced unsaved preview remain separate views.
+
+## Authorized service workspace
+
+The UI now requires sign-in and uses separate sidebar pages. Complete the manual
+account database tasks in [backend/ACCESS_SETUP.md](backend/ACCESS_SETUP.md) before
+running it. No default accounts exist. The prepared auth SQL is not applied by
+the regular migration runner. Backend access fails closed until account storage
+is ready. Use the same-origin Vite /api proxy and local cookie settings described
+in that guide.

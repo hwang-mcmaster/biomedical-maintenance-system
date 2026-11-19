@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { request, API_URL } from '../api'
 import { inventoryFields, displayValue } from '../equipmentFields'
 
-export default function EquipmentTable({ devices, loading, error, onRefresh, onDetails, onEdit, onDeleted }) {
+export default function EquipmentTable({ devices, loading, error, onRefresh, onDetails, onEdit, onDeleted, readOnly = false }) {
   const [confirmId, setConfirmId] = useState(null)
   const [deleting, setDeleting] = useState(null)
   const [deleteError, setDeleteError] = useState('')
@@ -24,7 +24,7 @@ export default function EquipmentTable({ devices, loading, error, onRefresh, onD
   return (
     <section className="panel" aria-labelledby="equipment-heading">
       <div className="section-heading"><h2 id="equipment-heading">Equipment</h2>
-        <div className="actions"><a className="button-link secondary" href={`${API_URL}/api/equipment/export`}>Export training CSV</a>
+        <div className="actions">{!readOnly && <a className="button-link secondary" href={`${API_URL}/api/equipment/export`}>Export training CSV</a>}
         <button type="button" className="secondary" disabled={loading} onClick={onRefresh}>Refresh table</button></div></div>
       <div role="status" aria-live="polite">
         {loading && <p>Loading equipment…</p>}
@@ -36,15 +36,16 @@ export default function EquipmentTable({ devices, loading, error, onRefresh, onD
         <caption className="sr-only">Biomedical equipment inventory</caption>
         <thead><tr>{[...inventoryFields.map(({ label }) => label), 'Actions'].map((heading) => <th key={heading} scope="col">{heading}</th>)}</tr></thead>
         <tbody>{devices.map((device) => <tr key={device.id}>
-          {inventoryFields.map(({ key }) => <td key={key} data-field={key}>{displayValue(key, device[key])}</td>)}
+          {inventoryFields.map(({ key }) => <td key={key} data-field={key}>{key === 'status' ? <span className={'status-badge ' + (device.status==='Under Maintenance'?'maintenance':device.status==='Inactive'?'inactive':device.status?'operational':'unknown')}>{displayValue(key, device[key])}</span> : displayValue(key, device[key])}</td>)}
           <td><div className="actions">
             <button type="button" className="secondary" onClick={() => onDetails(device.id)}>Details & assessment</button>
-            <button type="button" className="secondary" onClick={() => onEdit(device)}>Edit</button>
+            {!readOnly && <><button type="button" className="secondary" onClick={() => onEdit(device)}>Edit</button>
             {confirmId === device.id ? <>
               <span>Delete {device.asset_tag} permanently?</span>
-              <button type="button" disabled={Boolean(deleting)} onClick={() => remove(device)}>{deleting === device.id ? 'Deleting…' : 'Confirm delete'}</button>
+              <button type="button" className="danger" disabled={Boolean(deleting)} onClick={() => remove(device)}>{deleting === device.id ? 'Deleting…' : 'Confirm delete'}</button>
               <button type="button" className="secondary" disabled={Boolean(deleting)} onClick={() => setConfirmId(null)}>Cancel</button>
             </> : <button type="button" className="secondary" disabled={Boolean(deleting)} onClick={() => { setConfirmId(device.id); setDeleteError('') }}>Delete</button>}
+            </>}
           </div></td>
         </tr>)}</tbody>
       </table></div>}

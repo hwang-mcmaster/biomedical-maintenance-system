@@ -3,7 +3,7 @@ import {useApi} from '../useApi'
 import {useMutation,torontoTime} from './workflowHelpers'
 import MutationStatus from './MutationStatus'
 
-export default function EquipmentWorkflow({device,revision,onChanged}) {
+export default function EquipmentWorkflow({device,revision,onChanged,readOnly=false}) {
   const context=useApi(`/api/workflow/equipment/${device.id}`,revision)
   const action=useMutation()
   const [useAssessment,setUseAssessment]=useState(device.device_type==='Ventilator')
@@ -25,7 +25,7 @@ export default function EquipmentWorkflow({device,revision,onChanged}) {
       <p>{data.latest_saved_assessment.snapshot.recommendation}</p>
       <small>Assessed {torontoTime(data.latest_saved_assessment.snapshot.assessed_at)}. Model: {data.latest_saved_assessment.snapshot.prediction?.model_version || 'unreported'}. Historical snapshot; create a new task for a fresh assessment.</small>
     </aside>}
-    <form id="maintenance-task-form" className="workflow-form" onChange={()=>setRequestId(crypto.randomUUID())} onSubmit={submit}>
+    <form hidden={readOnly} id="maintenance-task-form" className="workflow-form" onChange={()=>setRequestId(crypto.randomUUID())} onSubmit={submit}>
       <fieldset disabled={action.busy}><legend>Create maintenance task</legend>
         <p>The server requests a fresh assessment and suggests priority. Manual priority requires an explanation.</p>
         <div className="form-grid">

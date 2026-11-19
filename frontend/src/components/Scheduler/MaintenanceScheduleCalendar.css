@@ -1,8 +1,8 @@
-ul {
+.calendar-container ul {
     padding-left: 0px;
 }
 
-li {
+.calendar-container li {
     list-style-type: none;
 }
 

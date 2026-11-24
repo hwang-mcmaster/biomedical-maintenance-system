@@ -98,7 +98,7 @@ Set-Location backend
 ### AI service: port 8001
 
 ```powershell
-.\ai.\venv\Scripts\python.exe -m uvicorn ai.app.main:app --reload --host 127.0.0.1 --port 8001
+.\ai\.venv\Scripts\python.exe -m uvicorn ai.app.main:app --reload --host 127.0.0.1 --port 8001
 ```
 
 ### Frontend: port 5173
@@ -166,24 +166,33 @@ ai/.venv/Scripts/python.exe -m unittest discover -s ai -p test_scheduler_lifecyc
 
 ## Database setup and migration
 
-For an existing RDS database, from backend/:
+All schema files live in `database/migrations/`. From backend/:
 
 ```powershell
 .\venv\Scripts\python.exe -m app.migrate
 ```
 
-The runner applies migration 002 (calculated metrics) and migration 003 (equipment
-metadata) in one transaction. Migration 003 adds missing optional columns and enum,
-replacement-cost and reference-life checks. Existing columns and records are
-preserved, including prior manual snapshots. It does not add fake type, status,
-location or lifespan values to existing records. Both migrations are re-runnable.
-The historical snapshot-required migration 001 is not rerun.
+The runner applies, in order and in one transaction:
 
-The configured RDS has been migrated and the existing record was checked unchanged.
+| File | Adds |
+| --- | --- |
+| 002_calculated_metrics.sql | Source-value checks and zero defaults; old snapshots kept |
+| 003_equipment_metadata.sql | Optional type, status, location, replacement cost and reference life |
+| 004_maintenance_workflow.sql | Technicians, tasks, schedules, assignments, history and booking guards |
+| 005_authentication.sql | Accounts, sessions, sign-in throttling and audit |
+| 006_review_workflow.sql | Criticality, engineering reviews and service policies |
+
+Applied files are recorded in a `schema_migrations` table, so a rerun only applies
+new files and prints what it did. Every file is re-runnable, so a database set up
+by hand before this table existed is safe: the first run re-checks each file and
+records it. Existing columns and records are preserved; no type, status, location
+or lifespan values are invented. The historical snapshot-required migration 001 is
+kept for reference and is not run.
+
 An unrecognized legacy enum or invalid cost/life value causes rollback; resolve the
 source data explicitly before retrying. Migration does not run on API startup.
-For a fresh database, run database/equipment.sql, then the migration runner if
-needed. Do not drop the shared table to change the application schema.
+For a fresh database, run database/equipment.sql, then the migration runner, then
+`python -m app.create_admin`. Do not drop the shared table to change the schema.
 
 ## API
 
@@ -332,7 +341,8 @@ frontend/src/
   components/EquipmentForm.jsx                Six inputs, two read-only calculated previews
   components/EquipmentTable.jsx               Inventory, export, retry and delete confirmation
   components/EquipmentDetails.jsx             Recorded values, calculation date and assessment
-  components/MaintenanceScheduleCalender.jsx  Calendar that displays all equipment scheduled for maintenance
+  components/WorkflowPanel.jsx                Tasks, technicians, schedule preview and confirmation
+  components/Scheduler/MaintenanceSchedule.jsx  Legacy calendar (admin Advanced tools)
 backend/app/
   main.py                                     Routes, CSV export and safe error responses
   schemas.py                                  Source-only requests and computed response fields
@@ -340,7 +350,12 @@ backend/app/
   database.py                                 Environment settings and verified TLS connection
   repository.py                               Parameterized SQL for source values only
   assessment.py                               AI client and recommendation mapping
-  migrate.py                                  Explicit current database migration
+  migrate.py                                  Ordered, recorded database migrations
+database/
+  equipment.sql                               Fresh-database equipment table
+  migrations/                                 002–006, applied by app.migrate
+docs/                                         Design document and project write-ups
+.github/workflows/ci.yml                      Offline backend/frontend checks on push
 ```
 
 ## Tests
@@ -353,6 +368,9 @@ backend/venv/Scripts/python.exe -m unittest discover -s backend -p 'test_*.py'
 npm.cmd --prefix frontend run lint
 npm.cmd --prefix frontend test
 ```
+
+GitHub Actions runs these same offline checks on every push and pull request
+(`.github/workflows/ci.yml`). Live tests below are never run in CI.
 
 With RDS configured and the AI server running, enable live backend tests:
 
@@ -373,7 +391,7 @@ leading-zero identifiers, safe errors and ignoring old snapshot columns.
 
 - RDS timeout: check public-IP security-group access, routing or VPN.
 - Missing configuration or CA: check backend/.env and DB_SSLROOTCERT.
-- Schema mismatch: apply migrations 002 and 003; readiness never changes the database.
+- Schema mismatch: run `python -m app.migrate` from backend/; readiness never changes the database.
 - AI unavailable: start its server on port 8001 with its own environment.
 - Port in use: stop the old server before starting another on that port.
 - A lost save response: refresh inventory before retrying. Unique asset tags and
@@ -400,9 +418,9 @@ calendar and advanced unsaved preview remain separate views.
 
 ## Authorized service workspace
 
-The UI now requires sign-in and uses separate sidebar pages. Complete the manual
-account database tasks in [backend/ACCESS_SETUP.md](backend/ACCESS_SETUP.md) before
-running it. No default accounts exist. The prepared auth SQL is not applied by
-the regular migration runner. Backend access fails closed until account storage
+The UI now requires sign-in and uses separate sidebar pages. The account tables
+come from migration 005, applied by `python -m app.migrate`; then create the first
+administrator as described in [backend/ACCESS_SETUP.md](backend/ACCESS_SETUP.md).
+No default accounts exist. Backend access fails closed until account storage
 is ready. Use the same-origin Vite /api proxy and local cookie settings described
 in that guide.

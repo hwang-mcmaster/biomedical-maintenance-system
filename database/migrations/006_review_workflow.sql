@@ -1,4 +1,4 @@
--- Apply explicitly after equipment/workflow and authentication setup. No data is deleted.
+-- Review workflow: criticality, engineering reviews, service policies. Applied by app.migrate after 005. Re-runnable; no data is deleted.
 ALTER TABLE equipment ADD COLUMN IF NOT EXISTS criticality VARCHAR(20)
  CHECK (criticality IN ('Routine','Important','Critical'));
 CREATE TABLE IF NOT EXISTS workflow_reviews (

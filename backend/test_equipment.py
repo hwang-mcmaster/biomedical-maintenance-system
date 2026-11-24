@@ -87,7 +87,7 @@ class EquipmentTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body['serial_number'], '0000123')
         self.assertEqual(body['calculated_as_of'], reference_date().isoformat())
-        self.assertEqual(set(body), set(PAYLOAD) | {'id', 'calculated_as_of', 'age_years', 'avg_annual_cost', 'reference_remaining_life_years'})
+        self.assertEqual(set(body), set(PAYLOAD) | {'id', 'calculated_as_of', 'age_years', 'avg_annual_cost', 'reference_remaining_life_years', 'criticality'})
         age = exact_age(date(2003, 3, 3), reference_date())
         self.assertEqual(Decimal(body['avg_annual_cost']), annual_average(Decimal('9678.12'), age))
         self.assertEqual(self.client.get('/api/equipment').json()[0]['id'], ID)

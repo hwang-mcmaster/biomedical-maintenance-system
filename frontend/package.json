@@ -10,8 +10,7 @@
     "preview": "vite preview",
     "test": "npm run build && node test-auth-pages.mjs && node test-ui-preview.mjs && node test-validation-pages.mjs && node test-review-controls.mjs",
     "test:live": "npm run build && node test-auth-workflow-live.mjs",
-    "test:workflow:live": "npm run test:live",
-    "test:legacy": "node test-flow.mjs && node test-scheduling.mjs"
+    "test:workflow:live": "npm run test:live"
   },
   "dependencies": {
     "@fullcalendar/react": "^7.1.4",

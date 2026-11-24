@@ -24,5 +24,5 @@ Desktop.ini
 *.swp
 *~
 
-# Downloaded RDS CA bundle
-backend/global-bundle.pem
+# Downloaded RDS CA bundle (download per machine; see README)
+global-bundle.pem

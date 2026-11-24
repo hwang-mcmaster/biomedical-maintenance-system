@@ -1,15 +1,15 @@
 # Authorized access and service workspace
 
 Frontend/backend implementation is complete enough for account and role testing.
-No authentication schema changes have been applied to RDS. The app intentionally
-fails closed until the database owner completes the tasks below. Existing accounts
-do not exist yet, and there are no default credentials or public registration.
+The app intentionally fails closed until the account tables exist. There are no
+default credentials or public registration.
 
 ## Database tasks for the database owner
 
-Review backend/AUTH_DATABASE_TASKS.sql and apply it manually to the intended DEV
-database first, after equipment/workflow migrations 002–004. It is deliberately
-not included in app.migrate and has NOT been run by this change.
+The account schema is `database/migrations/005_authentication.sql`. It is applied
+by `python -m app.migrate` after migrations 002–004 and before 006, and it is
+re-runnable. Apply it to the intended DEV database first. For a manual review,
+`psql -1 -f` runs it in one transaction. The file implements items 1–7 below.
 
 1. Create auth_users with unique normalized email, password hash, allowed role,
    active status and creation timestamp. Roles: admin/coordinator/technician.

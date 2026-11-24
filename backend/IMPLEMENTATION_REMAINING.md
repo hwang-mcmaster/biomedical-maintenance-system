@@ -11,7 +11,7 @@
 
 ## Required database setup
 
-The frontend/backend now require `backend/005_review_workflow.sql`. No shared database changes were executed by this implementation. The file adds one equipment column, two tables and one history flag; it preserves existing records. Apply after migrations 002–004 and `AUTH_DATABASE_TASKS.sql`, using the intended development database and the database owner's normal review process. The existing `python -m app.migrate` also includes this file, and therefore now requires authentication setup first.
+The frontend/backend require `database/migrations/006_review_workflow.sql` (formerly `backend/005_review_workflow.sql`), which adds one equipment column, two tables and one history flag and preserves existing records. It has been applied to the development database. `python -m app.migrate` applies 002–006 in order, including the authentication schema (005, formerly `backend/AUTH_DATABASE_TASKS.sql`), and records each file in `schema_migrations`.
 
 Verify the equipment API, review controls, recurrence, reconciliation and rescheduling against that database before the demo. Existing installations without migration 005 cannot run the updated equipment/workflow queries.
 
@@ -21,7 +21,7 @@ Twelve focused backend tests pass: eight policy/schema/transaction tests and fou
 
 Still required outside the completed application features:
 
-1. Apply migration 005 and authentication setup as needed; bootstrap accounts, then run live PostgreSQL/HTTP/browser acceptance tests. Include automatic next-cycle creation and simultaneous edits/confirmations.
+1. Bootstrap accounts if needed, then run live PostgreSQL/HTTP/browser acceptance tests against the migrated database. Include automatic next-cycle creation and simultaneous edits/confirmations.
 2. AI team: decide the lifecycle target, obtain suitable representative labels, train/evaluate independently, and support additional device categories. The unchanged model is cost regression plus repair intensity, not remaining-life/failure prediction.
 3. Approve the provisional recommendation and criticality policies against engineering/manufacturer guidance. A cumulative-cost ratio of 1 is a transparent review trigger, not an established replacement threshold.
 4. Measure actual completed work, approved labour/parts costs, downtime and multi-day fixed-interval policy outcomes. Existing baseline comparison remains same-input single-day placement.

@@ -103,8 +103,9 @@ The live React test renders the production bundle in JSDOM, sends real HTTP
 requests, creates equipment through the form, assesses it, creates a reviewed
 task and technician, compares/ confirms a schedule, and checks persistence after
 reload. It uses a generated temporary coordinator rather than an auth bypass.
-`test:workflow:live` is an alias. Older `test-live.mjs` and
-`test-workflow-live.mjs` are historical scripts and are no longer npm entry points.
+`test:workflow:live` is an alias. The pre-authentication scripts (`test-flow`,
+`test-scheduling`, `test-live`, `test-workflow-live`) were removed; they remain in
+git history.
 
 ## Saved evidence
 

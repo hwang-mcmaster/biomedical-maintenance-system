@@ -1,4 +1,4 @@
-"""Run from backend: python -m app.create_admin. Apply AUTH_DATABASE_TASKS.sql first."""
+"""Run from backend: python -m app.create_admin. Run python -m app.migrate first (creates the auth tables)."""
 from getpass import getpass
 from .auth import password
 from .database import get_connection

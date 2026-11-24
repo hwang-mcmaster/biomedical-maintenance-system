@@ -1,0 +1,29 @@
+
+> frontend@0.0.0 test
+> npm run build && node test-auth-pages.mjs && node test-ui-preview.mjs && node test-validation-pages.mjs
+
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.2 building client environment for production...
+transforming...
+✓ 83 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                  0.52 kB │ gzip:   0.31 kB
+dist/assets/PhantomGuardiansCoolGamingBold-q2Rlx-B7nddkoF.otf   26.74 kB
+dist/assets/logo_update-Cvgx6fdV.png                           865.72 kB
+dist/assets/index-BLYoooCG.css                                  33.82 kB │ gzip:   8.36 kB
+dist/assets/index-CP81i4-K.js                                  508.04 kB │ gzip: 150.66 kB
+
+✓ built in 189ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Account UI passed: login gate, navigation, role-aware actions, CSRF logout and session clearing.
+UI preview checks passed: explicit dev-only activation, sample reads and blocked mutations.
+Validation UI passed: 200 records, pagination, filters, explicit 100-task batching, conflict/API errors and expired session.
+Direct edit URL passed: waits for saved equipment and initializes existing form values.

@@ -8,9 +8,11 @@ MIGRATIONS = [MIGRATION_DIR / name for name in ['002_calculated_metrics.sql', '0
 
 
 def migrate():
+    # New review/recurrence tables require the separately managed authentication schema.
     with get_connection() as connection:
         for migration in MIGRATIONS:
             connection.execute(migration.read_text(encoding='utf-8'), prepare=False)
+        connection.execute((Path(__file__).resolve().parents[1] / '005_review_workflow.sql').read_text(encoding='utf-8'), prepare=False)
     print('Equipment and maintenance workflow migrations committed. Existing records preserved.')
 
 

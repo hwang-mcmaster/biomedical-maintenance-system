@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-11-19T16:13:56.885966+00:00",
+  "scope": "Authenticated in-process FastAPI requests against real PostgreSQL. Includes auth and DB latency; excludes browser/network transport. Test data inserted directly as explicitly labelled fixtures. CRUD and real AI workflow are tested separately.",
+  "scenarios": [
+    {
+      "fixture_records": 50,
+      "total_inventory_records": 51,
+      "list_api_ms": 277.47,
+      "response_bytes": 34287,
+      "detail_verified": true
+    },
+    {
+      "fixture_records": 100,
+      "total_inventory_records": 101,
+      "list_api_ms": 270.5,
+      "response_bytes": 68017,
+      "detail_verified": true
+    },
+    {
+      "fixture_records": 200,
+      "total_inventory_records": 201,
+      "list_api_ms": 290.81,
+      "response_bytes": 135477,
+      "detail_verified": true
+    }
+  ],
+  "fixture_equipment_cleanup_verified": true
+}

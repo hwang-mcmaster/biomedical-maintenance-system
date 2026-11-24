@@ -34,6 +34,7 @@ class EquipmentData(BaseModel):
     department_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)] | None = None
     location: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] | None = None
     status: Literal['Operational', 'Under Maintenance', 'Inactive'] | None = None
+    criticality: Literal['Routine', 'Important', 'Critical'] | None = None
     replacement_cost: Money | None = None
     expected_useful_life: Annotated[int, Field(strict=True, ge=1, le=2147483647)] | None = None
 
@@ -114,6 +115,9 @@ class Assessment(BaseModel):
     risk_level: Literal['low', 'medium', 'high']
     assessed_at: datetime
     method: str
+    recommendation_category: str | None = None
+    recommendation_reasons: list[str] = Field(default_factory=list)
+    policy_version: str | None = None
     recommendation: str
     limitation: str
     prediction: Prediction

@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title='Biomedical Maintenance API')
 app.include_router(scheduling_router)
 app.include_router(workflow_router)
+from .workflow_extensions import router as extensions_router
+app.include_router(extensions_router)
 app.include_router(auth_router)
 app.middleware("http")(access_control)
 app.add_middleware(
@@ -66,12 +68,16 @@ def ready():
     # Verify the expected columns as well as database connectivity.
     with get_connection() as connection:
         connection.execute(f'SELECT {repository.COLUMNS} FROM equipment LIMIT 0')
+        connection.execute('SELECT id FROM workflow_reviews LIMIT 0')
+        connection.execute('SELECT equipment_id FROM workflow_service_policies LIMIT 0')
+        connection.execute('SELECT aggregates_applied FROM workflow_history LIMIT 0')
+        connection.execute('SELECT recurring_due FROM workflow_tasks LIMIT 0')
     return {'status': 'ok', 'message': 'Equipment database is ready'}
 
 
 @app.get('/api/equipment/options')
 def equipment_options():
-    return {'device_types': DEVICE_TYPES, 'statuses': STATUSES, 'useful_life_unit': 'years', 'currency': 'CAD'}
+    return {'criticalities': ['Routine','Important','Critical'], 'device_types': DEVICE_TYPES, 'statuses': STATUSES, 'useful_life_unit': 'years', 'currency': 'CAD'}
 
 
 @app.get('/api/equipment', response_model=list[Equipment])

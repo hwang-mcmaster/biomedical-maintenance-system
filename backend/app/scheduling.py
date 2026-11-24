@@ -1,5 +1,5 @@
 """Deterministic feasibility prototype. No AI calls or database writes."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Response
 from . import repository
 from .calculations import BUSINESS_TIMEZONE
@@ -39,7 +39,9 @@ def qualification_key(value):
     return ' '.join(value.casefold().split())
 
 
-def generate_schedule(request, equipment, resource_bookings=()):
+def generate_schedule(request, equipment, resource_bookings=(), *, strategy='risk'):
+    if strategy not in ('risk', 'fixed_interval'):
+        raise ValueError('Unknown scheduling strategy.')
     referenced = {task.equipment_id for task in request.tasks} | {booking.equipment_id for booking in request.existing_bookings}
     missing = sorted(str(key) for key in referenced if str(key) not in equipment)
     if missing:
@@ -64,7 +66,12 @@ def generate_schedule(request, equipment, resource_bookings=()):
             equipment_busy[equipment_id].append((start, end))
 
     assignments, unscheduled = [], []
-    for task in sorted(request.tasks, key=lambda item: (PRIORITY_ORDER[item.priority], item.id)):
+    def task_order(item):
+        deadline = min((d for d in (item.service_due_date,item.due_date) if d is not None),default=date.max)
+        return ((PRIORITY_ORDER[item.priority], deadline, item.id) if strategy == 'risk'
+                else (item.service_due_date or item.due_date or date.max, item.id))
+
+    for task in sorted(request.tasks, key=task_order):
         duration = timedelta(minutes=task.duration_minutes)
         qualified = [tech for tech in request.technicians if qualification_key(task.required_qualification)
                      in {qualification_key(value) for value in tech.qualifications}]
@@ -98,6 +105,8 @@ def generate_schedule(request, equipment, resource_bookings=()):
             duration_minutes=task.duration_minutes, start=start.astimezone(BUSINESS_TIMEZONE), end=end.astimezone(BUSINESS_TIMEZONE)))
     assignments.sort(key=lambda item: (item.start.astimezone(timezone.utc), item.technician_id, item.task_id))
     return SchedulePreview(schedule_date=request.schedule_date, generated_at=datetime.now(timezone.utc),
+        algorithm=('Priority first, then earliest target date and feasible slot.' if strategy == 'risk'
+                   else 'Fixed-interval due date first, then earliest feasible slot; no risk ordering.'),
         assignments=assignments, unscheduled=unscheduled, notices=[
             'Preview only. Tasks, technicians, qualifications, availability and bookings are supplied inputs; this plan is not saved or booked.',
             'Priority-first placement produces a feasible draft, not a globally optimized schedule. Some unassigned tasks may fit under a different ordering.',

@@ -15,6 +15,7 @@ from app.workflow import priority_policy
 from app.workflow_schemas import TechnicianInput, TaskInput
 from pydantic import ValidationError
 from test_equipment import PAYLOAD
+from live_test_support import authenticated_fixture
 
 class PolicyTests(unittest.TestCase):
     def test_mapping_and_explanation(self):
@@ -37,7 +38,7 @@ class PolicyTests(unittest.TestCase):
 @unittest.skipUnless(os.getenv('RUN_WORKFLOW_TESTS')=='1','Set RUN_WORKFLOW_TESTS=1 for isolated RDS workflow fixtures.')
 class WorkflowIntegrationTests(unittest.TestCase):
     def setUp(self):
-        self.client=TestClient(app);self.token=uuid4().hex;self.equipment=[];self.techs=[];self.runs=[]
+        self.client=authenticated_fixture(self);self.token=uuid4().hex;self.equipment=[];self.techs=[];self.runs=[]
         self.day=(reference_date()+timedelta(days=2)).isoformat()
         with get_connection() as c:
             self.original=c.execute('SELECT count(*) AS n FROM equipment').fetchone()['n']
@@ -118,7 +119,8 @@ class WorkflowIntegrationTests(unittest.TestCase):
         plans=[self.preview([t['id']]) for t in [a,b]];barrier=Barrier(2)
         def confirm(p):
             barrier.wait()
-            return TestClient(app).post('/api/workflow/schedules/'+p['id']+'/confirm',json={}).status_code
+            with TestClient(app,headers=dict(self.client.headers),cookies=dict(self.client.cookies)) as client:
+                return client.post('/api/workflow/schedules/'+p['id']+'/confirm',json={}).status_code
         with ThreadPoolExecutor(max_workers=2) as pool: codes=list(pool.map(confirm,plans))
         self.assertEqual(sorted(codes),[200,409])
 
@@ -141,6 +143,47 @@ class WorkflowIntegrationTests(unittest.TestCase):
           'availability':[{'date':self.day,'start':'13:00','end':'17:00'}]})
         self.assertEqual(r.status_code,200,r.text)
         self.post(f"schedules/{plan['id']}/confirm",{},409)
+
+    def test_interval_metadata_and_baseline_are_saved(self):
+        self.technician()
+        last=(reference_date()-timedelta(days=40)).isoformat()
+        task=self.task(last_service_date=last,service_interval_days=30)
+        self.assertTrue(task['service_interval_recorded'])
+        plan=self.preview([task['id']])
+        self.assertTrue(plan['metrics']['validation']['passed'])
+        self.assertEqual(plan['metrics']['service_interval_scheduled_late'],1)
+        self.assertEqual(plan['comparison']['service_interval_coverage'],'1/1')
+        self.assertTrue(plan['comparison']['baseline']['metrics']['validation']['passed'])
+        saved=self.client.get('/api/workflow/schedules').json()
+        self.assertEqual(next(r for r in saved if r['id']==plan['id'])['result']['comparison'],plan['comparison'])
+
+    def test_overrunning_work_does_not_release_resources(self):
+        self.technician();task=self.task();plan=self.preview([task['id']])
+        self.post(f"schedules/{plan['id']}/confirm",{},200)
+        clock=datetime.fromisoformat(plan['assignments'][0]['end'])+timedelta(minutes=30)
+        class Clock(datetime):
+            @classmethod
+            def now(cls,tz=None): return clock.astimezone(tz or timezone.utc)
+        next_task=self.task(eq=self.create_equipment())
+        with patch('app.workflow.datetime',Clock),patch('app.workflow.reference_date',return_value=clock.date()):
+            self.post(f"tasks/{task['id']}/status",{'status':'in_progress','notes':'Fixture overrun'},200)
+            next_plan=self.preview([next_task['id']])
+        self.assertEqual(next_plan['metrics']['scheduled_count'],0)
+        self.assertEqual(next_plan['unscheduled'][0]['reason_code'],'RESOURCE_CONFLICT')
+
+    def test_service_cannot_predate_equipment(self):
+        self.post('tasks',{'equipment_id':self.eq,'title':'Invalid service','duration_minutes':60,
+          'required_qualification':self.token,'use_assessment':False,'priority_override':'High',
+          'override_reason':'Fixture review','last_service_date':'2000-01-01','service_interval_days':30},422)
+
+    def test_expired_session_and_csrf_cannot_create_tasks(self):
+        body={'equipment_id':self.eq,'title':'Blocked','duration_minutes':60,'required_qualification':self.token,
+              'use_assessment':False,'priority_override':'High','override_reason':'Fixture review'}
+        with TestClient(app) as anonymous:
+            self.assertEqual(anonymous.post('/api/workflow/tasks',json=body).status_code,401)
+        saved=self.client.headers.pop('X-CSRF-Token')
+        self.assertEqual(self.client.post('/api/workflow/tasks',json=body).status_code,403)
+        self.client.headers['X-CSRF-Token']=saved
 
     def test_database_guard_rejects_legacy_overlap(self):
         import psycopg

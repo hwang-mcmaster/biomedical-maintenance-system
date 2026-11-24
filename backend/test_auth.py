@@ -57,6 +57,7 @@ class AuthTests(unittest.TestCase):
    sql=connect.return_value.__enter__.return_value.execute.call_args.args[0]
    self.assertIn('DELETE FROM auth_sessions',sql)
 
+ @patch.dict('os.environ',{'AUTH_COOKIE_SECURE':'true'})
  def test_login_issues_secure_opaque_cookie(self):
   user=USER|{'password_hash':password('fixture-pass-2026')}
   with patch('app.auth.get_connection') as connect:

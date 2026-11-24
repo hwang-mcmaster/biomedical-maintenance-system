@@ -53,6 +53,8 @@ class MaintenanceTask(InputModel):
     priority: Priority = 'Medium'
     required_qualification: Label
     duration_minutes: Annotated[int, Field(strict=True, ge=1, le=1440)]
+    due_date: date | None = None
+    service_due_date: date | None = None
 
 
 class ExistingBooking(TimeWindow):

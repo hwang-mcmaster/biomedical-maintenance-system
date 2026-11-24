@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 from decimal import Decimal
@@ -33,6 +33,8 @@ class TaskInput(InputModel):
     priority_override: Priority | None = None
     override_reason: Annotated[str, Field(min_length=3, max_length=2000)] | None = None
     due_date: date | None = None
+    last_service_date: date | None = None
+    service_interval_days: Annotated[int, Field(strict=True, ge=1, le=3650)] | None = None
 
     @model_validator(mode='after')
     def explicit_priority(self):
@@ -43,7 +45,15 @@ class TaskInput(InputModel):
         if self.priority_override and not self.override_reason: raise ValueError('A priority override requires an explanation.')
         if not self.use_assessment and not (self.priority_override and self.override_reason):
             raise ValueError('Without assessment, enter an explicit priority and explanation.')
-        if self.due_date and self.due_date < reference_date(): raise ValueError('Target date cannot be in the past.')
+        if (self.last_service_date is None) != (self.service_interval_days is None):
+            raise ValueError('Supply both last service date and service interval, or leave both empty.')
+        if self.last_service_date and self.last_service_date > reference_date():
+            raise ValueError('Last service date cannot be in the future.')
+        service_due = self.last_service_date + timedelta(days=self.service_interval_days) if self.last_service_date else None
+        if self.due_date and service_due and self.due_date > service_due:
+            raise ValueError('A review target cannot postpone the entered service interval deadline.')
+        if self.due_date and self.due_date < reference_date() and not service_due:
+            raise ValueError('Target date cannot be in the past without a recorded service interval.')
         return self
 
 class PlanInput(InputModel):

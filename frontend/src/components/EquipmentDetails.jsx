@@ -50,7 +50,7 @@ export default function EquipmentDetails({ device, onClose, readOnly = false, wo
       {error && <p role="alert" className="error">{error}</p>}
       {assessment && <div className="assessment">
         <p><strong>Repair intensity: {assessment.risk_level}</strong></p>
-        <p>{assessment.recommendation}</p>
+        <p><strong>{assessment.recommendation_category || 'Review recommendation'}</strong></p><p>{assessment.recommendation}</p><ul>{assessment.recommendation_reasons?.map(r=><li key={r}>{r}</li>)}</ul>
         {notices.length > 0 && <aside className="notice" aria-label="Assessment notes"><strong>Assessment notes</strong>
           <ul>{notices.map((notice) => <li key={notice}>{notice}</li>)}</ul>
         </aside>}

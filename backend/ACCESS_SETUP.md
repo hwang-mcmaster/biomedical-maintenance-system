@@ -106,12 +106,13 @@ Deployment tasks outside frontend/backend code changes:
     npm.cmd --prefix frontend test
     npm.cmd --prefix frontend run lint
 
-The account tests mock persistence and verify login gates, roles, CSRF, logout,
-hashing and assignment ownership. Business unit tests use a scoped identity mock,
-never a production bypass. Real session/invitation/last-admin/concurrent account
-integration checks must follow manual database setup. Old unauthenticated browser
-live scripts require conversion to authenticated fixtures before use; they are
-not proof of the new account flow. No live-auth pass is claimed before migration.
+The account unit tests mock persistence and verify login gates, roles, CSRF,
+logout, hashing and assignment ownership. Business unit tests use a scoped identity
+mock, never a production bypass. Current opt-in PostgreSQL/workflow tests and
+the React live npm entry point use real temporary accounts, session cookies and
+CSRF. See VALIDATION.md for commands and saved results. Invitation/reset,
+last-admin races and wider account lifecycle scenarios still need additional
+live coverage. Older standalone unauthenticated scripts are historical only.
 The workspace still uses existing small-fleet list APIs for data loading; table
 pagination is client-side. Server-side paging is a later scalability improvement.
 

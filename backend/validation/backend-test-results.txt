@@ -1,0 +1,79 @@
+C:\Users\Gordon\Desktop\Class Material\fall 2026\Senior Eng Project\Git repo\biomedical-maintenance-system\backend\venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+test_csrf_and_origin (test_auth.AuthTests.test_csrf_and_origin) ... ok
+test_expired_activation_rejected (test_auth.AuthTests.test_expired_activation_rejected) ... ok
+test_failed_login_persists_attempts (test_auth.AuthTests.test_failed_login_persists_attempts) ... ok
+test_last_admin_preserved (test_auth.AuthTests.test_last_admin_preserved) ... ok
+test_login_issues_secure_opaque_cookie (test_auth.AuthTests.test_login_issues_secure_opaque_cookie) ... ok
+test_login_origin (test_auth.AuthTests.test_login_origin) ... ok
+test_logout_revokes (test_auth.AuthTests.test_logout_revokes) ... ok
+test_password_hash (test_auth.AuthTests.test_password_hash) ... ok
+test_permissions (test_auth.AuthTests.test_permissions) ... ok
+test_signed_out_denied (test_auth.AuthTests.test_signed_out_denied) ... ok
+test_technician_ownership (test_auth.AuthTests.test_technician_ownership) ... ok
+test_temporary_password_length_boundaries (test_auth.AuthTests.test_temporary_password_length_boundaries) ... ok
+test_throttle (test_auth.AuthTests.test_throttle) ... ok
+test_unconfigured_fails_closed (test_auth.AuthTests.test_unconfigured_fails_closed) ... ok
+test_missing_range_is_explicit_and_legacy_score_is_preserved (test_equipment.AssessmentPresentationTests.test_missing_range_is_explicit_and_legacy_score_is_preserved) ... ok
+test_projection_uses_returned_annual_cents (test_equipment.AssessmentPresentationTests.test_projection_uses_returned_annual_cents) ... ok
+test_range_boundaries_and_outliers (test_equipment.AssessmentPresentationTests.test_range_boundaries_and_outliers) ... ok
+test_assessment_failure (test_equipment.EquipmentTests.test_assessment_failure) ... ok
+test_assessment_uses_unrounded_age (test_equipment.EquipmentTests.test_assessment_uses_unrounded_age) ... ok
+test_calculations_and_zero_age (test_equipment.EquipmentTests.test_calculations_and_zero_age) ... ok
+test_cors_and_health (test_equipment.EquipmentTests.test_cors_and_health) ... ok
+test_crud_contract (test_equipment.EquipmentTests.test_crud_contract) ... ok
+test_database_failures_are_safe (test_equipment.EquipmentTests.test_database_failures_are_safe) ... Database operation failed: OperationalError
+Database configuration is incomplete or certificate is missing.
+Database operation failed: UniqueViolation
+Database operation failed: ForeignKeyViolation
+ok
+test_dated_training_export (test_equipment.EquipmentTests.test_dated_training_export) ... ok
+test_default_counts_and_cost (test_equipment.EquipmentTests.test_default_counts_and_cost) ... ok
+test_missing_records (test_equipment.EquipmentTests.test_missing_records) ... ok
+test_validation (test_equipment.EquipmentTests.test_validation) ... ok
+test_zero_elapsed_age_assessment (test_equipment.EquipmentTests.test_zero_elapsed_age_assessment) ... ok
+test_enums_and_optional_metadata (test_equipment.OperationalContractTests.test_enums_and_optional_metadata) ... ok
+test_reference_life_is_not_model_prediction (test_equipment.OperationalContractTests.test_reference_life_is_not_model_prediction) ... ok
+test_scope_is_enforced_before_calling_ai (test_equipment.OperationalContractTests.test_scope_is_enforced_before_calling_ai) ... ok
+test_defaults_and_legacy_snapshots_ignored (test_postgres.PostgresTests.test_defaults_and_legacy_snapshots_ignored) ... ok
+test_persistence_update_uniqueness_and_delete (test_postgres.PostgresTests.test_persistence_update_uniqueness_and_delete) ... Database operation failed: UniqueViolation
+ok
+test_saved_equipment_through_real_ai_service (test_postgres.PostgresTests.test_saved_equipment_through_real_ai_service) ... ok
+test_inventory_at_50_100_200 (test_scale.InventoryScaleTests.test_inventory_at_50_100_200) ... ok
+test_corrupt_outputs_fail_independent_checks (test_schedule_validation.ValidationTests.test_corrupt_outputs_fail_independent_checks) ... ok
+test_due_date_breaks_priority_tie_and_late_intervals_are_measured (test_schedule_validation.ValidationTests.test_due_date_breaks_priority_tie_and_late_intervals_are_measured) ... ok
+test_risk_and_baseline_same_constraints (test_schedule_validation.ValidationTests.test_risk_and_baseline_same_constraints) ... ok
+test_service_interval_validation (test_schedule_validation.ValidationTests.test_service_interval_validation) ... ok
+test_adjacent_tasks_fit_exactly (test_scheduling.SchedulingTests.test_adjacent_tasks_fit_exactly) ... ok
+test_bookings_and_breaks_respected (test_scheduling.SchedulingTests.test_bookings_and_breaks_respected) ... ok
+test_case_insensitive_qualifications (test_scheduling.SchedulingTests.test_case_insensitive_qualifications) ... ok
+test_conflicting_existing_bookings_rejected (test_scheduling.SchedulingTests.test_conflicting_existing_bookings_rejected) ... ok
+test_deterministic_ties (test_scheduling.SchedulingTests.test_deterministic_ties) ... ok
+test_dst_ambiguous_and_nonexistent_inputs_rejected (test_scheduling.SchedulingTests.test_dst_ambiguous_and_nonexistent_inputs_rejected) ... ok
+test_dst_duration_is_elapsed_time (test_scheduling.SchedulingTests.test_dst_duration_is_elapsed_time) ... ok
+test_equipment_and_technician_never_double_booked (test_scheduling.SchedulingTests.test_equipment_and_technician_never_double_booked) ... ok
+test_missing_equipment_is_not_scheduled (test_scheduling.SchedulingTests.test_missing_equipment_is_not_scheduled) ... ok
+test_priority_wins_scarce_slot (test_scheduling.SchedulingTests.test_priority_wins_scarce_slot) ... ok
+test_real_equipment_reference_and_no_persistence (test_scheduling.SchedulingTests.test_real_equipment_reference_and_no_persistence) ... ok
+test_request_validation (test_scheduling.SchedulingTests.test_request_validation) ... ok
+test_unassigned_reasons (test_scheduling.SchedulingTests.test_unassigned_reasons) ... ok
+test_manual_mode_and_invalid_inputs (test_workflow.PolicyTests.test_manual_mode_and_invalid_inputs) ... ok
+test_mapping_and_explanation (test_workflow.PolicyTests.test_mapping_and_explanation) ... ok
+test_ai_snapshot_drives_priority (test_workflow.WorkflowIntegrationTests.test_ai_snapshot_drives_priority) ... ok
+test_changed_availability_invalidates_preview (test_workflow.WorkflowIntegrationTests.test_changed_availability_invalidates_preview) ... ok
+test_conflicting_previews_and_concurrent_confirmation (test_workflow.WorkflowIntegrationTests.test_conflicting_previews_and_concurrent_confirmation) ... ok
+test_database_guard_rejects_legacy_overlap (test_workflow.WorkflowIntegrationTests.test_database_guard_rejects_legacy_overlap) ... ok
+test_expired_session_and_csrf_cannot_create_tasks (test_workflow.WorkflowIntegrationTests.test_expired_session_and_csrf_cannot_create_tasks) ... ok
+test_full_manual_and_assessment_flow (test_workflow.WorkflowIntegrationTests.test_full_manual_and_assessment_flow) ... ok
+test_interval_metadata_and_baseline_are_saved (test_workflow.WorkflowIntegrationTests.test_interval_metadata_and_baseline_are_saved) ... ok
+test_missing_qualification_and_validation (test_workflow.WorkflowIntegrationTests.test_missing_qualification_and_validation) ... ok
+test_overrunning_work_does_not_release_resources (test_workflow.WorkflowIntegrationTests.test_overrunning_work_does_not_release_resources) ... ok
+test_real_model_to_saved_assignment (test_workflow.WorkflowIntegrationTests.test_real_model_to_saved_assignment) ... ok
+test_service_cannot_predate_equipment (test_workflow.WorkflowIntegrationTests.test_service_cannot_predate_equipment) ... ok
+test_stale_equipment_and_technician_edit (test_workflow.WorkflowIntegrationTests.test_stale_equipment_and_technician_edit) ... ok
+test_task_retry_is_idempotent (test_workflow.WorkflowIntegrationTests.test_task_retry_is_idempotent) ... ok
+
+----------------------------------------------------------------------
+Ran 67 tests in 75.325s
+
+OK

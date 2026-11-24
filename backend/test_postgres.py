@@ -9,12 +9,13 @@ from app.database import get_connection
 from fastapi.testclient import TestClient
 from app.main import app
 from test_equipment import PAYLOAD
+from live_test_support import authenticated_fixture
 
 
 @unittest.skipUnless(os.getenv('RUN_POSTGRES_TESTS') == '1', 'Set RUN_POSTGRES_TESTS=1 to test the configured PostgreSQL database.')
 class PostgresTests(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self.client = authenticated_fixture(self)
         self.ids = []
         token = uuid4().hex
         self.payload = PAYLOAD | {'asset_tag': f'CODEX-TEST-{token}', 'serial_number': f'000{token}'}

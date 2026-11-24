@@ -2,6 +2,8 @@ import {useState} from 'react'
 import {useApi} from '../useApi'
 import {useMutation,nextTorontoDay,torontoTime} from './workflowHelpers'
 import MutationStatus from './MutationStatus'
+import AssignmentEditor from './AssignmentEditor'
+import ScheduleMeasurements from './ScheduleMeasurements'
 
 export default function WorkflowPanel({revision,onChanged,view='full'}) {
   const techs=useApi('/api/workflow/technicians',revision),tasks=useApi('/api/workflow/tasks',revision)
@@ -11,13 +13,17 @@ export default function WorkflowPanel({revision,onChanged,view='full'}) {
   const [windows,setWindows]=useState([{date:nextTorontoDay(),start:'09:00',end:'17:00'}])
   const [day,setDay]=useState(nextTorontoDay()),[selected,setSelected]=useState([]),[preview,setPreview]=useState(null),[statusTask,setStatusTask]=useState(null)
   const pending=(tasks.data||[]).filter(t=>t.status==='pending')
+  const selectedPending=selected.filter(id=>pending.some(t=>t.id===id))
+  const planningIds=selectedPending.length?selectedPending:pending.map(t=>t.id)
+  const planningLimit=planningIds.length>100
+  function choose(id,checked){setPreview(null);setSelected(checked?[...selectedPending,id]:selectedPending.filter(value=>value!==id))}
   function changed(){setPreview(null);setSelected([]);onChanged()}
   function edit(t){setEditTech(t.id);setTechName(t.name);setSkills(t.qualifications.join(', '));setWindows(t.availability)}
   function reset(){setEditTech(null);setTechName('');setSkills('');setWindows([{date:nextTorontoDay(),start:'09:00',end:'17:00'}])}
   function saveTech(e){e.preventDefault();action.run(editTech?`/api/workflow/technicians/${editTech}`:'/api/workflow/technicians',{
     name:techName,qualifications:skills.split(',').map(s=>s.trim()).filter(Boolean),availability:windows},()=>{reset();changed()},editTech?'PUT':'POST')}
   function generate(e){e.preventDefault();setPreview(null);action.run('/api/workflow/schedules/preview',{
-    schedule_date:day,task_ids:selected.length?selected:pending.map(t=>t.id)},result=>{setPreview(result);onChanged()})}
+    schedule_date:day,task_ids:planningIds},result=>{setPreview(result);onChanged()})}
   function status(e){e.preventDefault();const f=new FormData(e.currentTarget);action.run(`/api/workflow/tasks/${statusTask.id}/status`,{
     status:statusTask.next,notes:f.get('notes'),actual_cost:f.get('cost')||'0.00'},()=>{setStatusTask(null);changed()})}
   const unavailable=[techs,tasks,assignments,schedules].some(s=>s.loading||s.error)
@@ -40,24 +46,30 @@ export default function WorkflowPanel({revision,onChanged,view='full'}) {
     </fieldset></form>
     </div>}{['full','tasks'].includes(view)&&<div><h3>Maintenance tasks</h3><p>Choose tasks below, or leave them unchecked to schedule all pending tasks (up to 100).</p>
     <div className="table-wrapper"><table className="workflow-table"><caption>Saved maintenance tasks</caption><thead><tr><th>Select</th><th>Equipment / task</th><th>Priority and reason</th><th>Requirements</th><th>Status / action</th></tr></thead><tbody>{tasks.data?.map(t=><tr key={t.id}>
-      <td>{t.status==='pending'&&<input type="checkbox" aria-label={`Schedule ${t.title} for ${t.asset_tag}`} checked={selected.includes(t.id)} onChange={e=>{setPreview(null);setSelected(e.target.checked?[...selected,t.id]:selected.filter(id=>id!==t.id))}}/>}</td>
-      <td>{t.asset_tag}<br/>{t.title}</td><td>{t.priority}<small>{t.priority_reason}</small><small>Target: {t.due_date}</small></td><td>{t.duration_minutes} min<br/>{t.required_qualification}</td><td>{t.status}<div className="actions">
+      <td>{t.status==='pending'&&<input type="checkbox" aria-label={`Schedule ${t.title} for ${t.asset_tag}`} checked={selectedPending.includes(t.id)} disabled={!selectedPending.includes(t.id)&&selectedPending.length>=100} onChange={e=>choose(t.id,e.target.checked)}/>}</td>
+      <td><a href={'#/equipment/'+t.equipment_id}>{t.asset_tag}</a><br/>{t.title}</td><td>{t.priority}<small>{t.priority_reason}</small><small>Target: {t.due_date}</small><small>{t.service_due_date?`Service due: ${t.service_due_date}`:'Service interval not recorded'}</small></td><td>{t.duration_minutes} min<br/>{t.required_qualification}</td><td>{t.status}<div className="actions">
         {t.status==='scheduled'&&<button type="button" disabled={action.busy} onClick={()=>setStatusTask({...t,next:'in_progress'})}>Start task</button>}
         {t.status==='in_progress'&&<button type="button" disabled={action.busy} onClick={()=>setStatusTask({...t,next:'completed'})}>Complete task</button>}
         {!['completed','cancelled'].includes(t.status)&&<button type="button" className="secondary" disabled={action.busy} onClick={()=>setStatusTask({...t,next:'cancelled'})}>Cancel task</button>}</div></td>
     </tr>)}</tbody></table></div>
     {statusTask&&<form id="task-status-form" className="workflow-form" onSubmit={status}><fieldset disabled={action.busy}><legend>{statusTask.title}: {statusTask.next}</legend><label>Status notes<textarea name="notes" required minLength={3} maxLength={2000}/></label>{statusTask.next==='completed'&&<label>Actual maintenance cost (CAD)<input name="cost" type="number" required min="0" step="0.01" defaultValue="0"/></label>}<div className="actions"><button disabled={action.busy}>Save task status</button><button type="button" className="secondary" onClick={()=>setStatusTask(null)}>Close status form</button></div></fieldset></form>}
-    </div>}{['full','scheduling'].includes(view)&&<div><form id="saved-schedule-form" className="workflow-form" onSubmit={generate}><fieldset disabled={action.busy||unavailable}><legend>Generate from saved records</legend><label>Planning date (Toronto)<input type="date" required value={day} onChange={e=>{setDay(e.target.value);setPreview(null)}}/></label><button disabled={action.busy||unavailable||!pending.length}>Generate saved schedule preview</button></fieldset></form>
-    {preview&&<div className="schedule-results"><h3>Schedule review</h3><p>{preview.assignments.length} scheduled, {preview.unscheduled.length} unassigned. Draft ID: {preview.id}</p>
+    </div>}{['full','scheduling'].includes(view)&&<div><form id="saved-schedule-form" className="workflow-form" onSubmit={e=>{if(planningLimit){e.preventDefault();return}generate(e)}}><fieldset disabled={action.busy||unavailable}><legend>Generate from saved records</legend><label>Planning date (Toronto)<input type="date" required value={day} onChange={e=>{setDay(e.target.value);setPreview(null)}}/></label>
+    <details className="planning-task-picker"><summary>Planning cohort: {planningIds.length} of {pending.length} pending tasks</summary><p>Leave all unchecked to include every pending task when there are at most 100. For larger inventories, explicitly choose a batch of up to 100; remaining tasks stay pending.</p><div className="actions"><button type="button" className="secondary" onClick={()=>{setSelected(pending.slice(0,100).map(t=>t.id));setPreview(null)}}>Select first {Math.min(100,pending.length)} pending tasks</button><button type="button" className="secondary" onClick={()=>{setSelected([]);setPreview(null)}}>Clear selection</button></div><div className="planning-task-list">{pending.map(t=><label key={t.id}><input type="checkbox" aria-label={`Include ${t.title} for ${t.asset_tag}`} checked={selectedPending.includes(t.id)} disabled={!selectedPending.includes(t.id)&&selectedPending.length>=100} onChange={e=>choose(t.id,e.target.checked)}/>{t.asset_tag}: {t.title} · {t.priority} · target {t.due_date}</label>)}</div></details>
+    {planningLimit&&<p role="alert" className="notice">This run exceeds the 100-task limit. Select a batch above. No tasks are silently removed.</p>}
+    {!pending.length&&<p>No pending tasks. Create a reviewed task from equipment details first.</p>}
+    <button disabled={action.busy||unavailable||!pending.length||planningLimit}>Generate saved schedule preview</button></fieldset></form>
+    {preview&&<div className="schedule-results"><h3>Schedule review</h3><p>{preview.assignments.length} scheduled, {preview.unscheduled.length} unassigned. Schedule ID: {preview.id}</p>
       <div className="table-wrapper"><table className="workflow-table"><caption>Proposed assignments</caption><thead><tr><th>Task / equipment</th><th>Technician</th><th>Toronto time</th><th>Priority explanation</th></tr></thead><tbody>{preview.assignments.map(a=><tr key={a.task_id}><td>{a.title}<br/>{a.asset_tag}</td><td>{a.technician_name}</td><td>{torontoTime(a.start)}<br/>{torontoTime(a.end)}</td><td>{a.priority}<small>{a.priority_reason}</small><small>{a.within_target?'Within':'After'} review target: {a.due_date}</small></td></tr>)}</tbody></table></div>
       <ul>{preview.unscheduled.map(t=><li key={t.task_id}>{t.asset_tag}: {t.title}. {t.reason}</li>)}</ul>
-      <p>Computation: {preview.metrics.computation_ms} ms. Conflicts: {preview.metrics.conflicts}. High-priority tasks scheduled within target: {preview.metrics.high_priority_scheduled_within_target}/{preview.metrics.high_priority_requested}. Selected-task utilization: {preview.metrics.selected_task_utilization_percent}%.</p>
+      <p>Computation: {preview.metrics.computation_ms==null?'N/A':`${preview.metrics.computation_ms} ms`}. Conflicts: {preview.metrics.conflicts}. High-priority tasks scheduled within target: {preview.metrics.high_priority_scheduled_within_target}/{preview.metrics.high_priority_requested}. Selected-task utilization: {preview.metrics.selected_task_utilization_percent}%.</p>
+      <ScheduleMeasurements plan={preview}/>
       <ul>{preview.notices.map(n=><li key={n}>{n}</li>)}</ul>
-      <button type="button" disabled={action.busy||!preview.assignments.length} onClick={()=>action.run(`/api/workflow/schedules/${preview.id}/confirm`,{},()=>{setSelected([]);changed()})}>Confirm schedule</button>
+      {preview.booked?<p>This saved schedule has already been confirmed. Its results describe the inputs at generation time.</p>:<button type="button" disabled={action.busy||!preview.assignments.length} onClick={()=>action.run(`/api/workflow/schedules/${preview.id}/confirm`,{},()=>{setSelected([]);changed()})}>Confirm schedule</button>}
     </div>}
-    <h3>Confirmed maintenance assignments</h3><div className="table-wrapper"><table className="workflow-table"><caption>Upcoming work and assignment history</caption><thead><tr><th>Equipment / task</th><th>Technician</th><th>Toronto time</th><th>Status</th><th>Priority</th></tr></thead><tbody>{assignments.data?.map(a=><tr key={a.id}><td>{a.asset_tag}<br/>{a.title}</td><td>{a.technician_name}</td><td>{torontoTime(a.starts_at)}<br/>{torontoTime(a.ends_at)}</td><td>{a.status}</td><td>{a.priority}<small>{a.priority_reason}</small></td></tr>)}</tbody></table></div>
+    <h3>Confirmed maintenance assignments</h3><div className="table-wrapper"><table className="workflow-table"><caption>Upcoming work and assignment history</caption><thead><tr><th>Equipment / task</th><th>Technician</th><th>Toronto time</th><th>Status</th><th>Priority</th></tr></thead><tbody>{assignments.data?.map(a=><tr key={a.id}><td>{a.asset_tag}<br/>{a.title}</td><td>{a.technician_name}</td><td>{torontoTime(a.starts_at)}<br/>{torontoTime(a.ends_at)}</td><td>{a.status}{a.status==='scheduled'&&<AssignmentEditor assignment={a} technicians={techs.data||[]} onChanged={changed}/>}</td><td>{a.priority}<small>{a.priority_reason}</small></td></tr>)}</tbody></table></div>
+    {metrics.error&&<p role="alert">Unable to load recorded completion results. {metrics.error}</p>}
     {metrics.data?.high_priority_completion && <p>Recorded high-priority work completed within its review target: {metrics.data.high_priority_completion.completed_within_target}/{metrics.data.high_priority_completion.completed}. Completion results come from recorded work, not generated schedules.</p>}
-    <details><summary>Saved schedule runs and measurements</summary><ul>{schedules.data?.map(s=><li key={s.id}>{s.schedule_date}, {s.status}: {s.result.metrics?.scheduled_count} assignments in {s.result.metrics?.computation_ms} ms. {s.status==='draft'&&<button type="button" className="secondary" onClick={()=>setPreview({...s.result,id:s.id})}>Review saved draft</button>}</li>)}</ul></details>
+    <details><summary>Saved schedule runs and measurements</summary><ul>{schedules.data?.map(s=><li key={s.id}>{s.schedule_date}, {s.status}: {s.result.metrics?.scheduled_count} assignments. Computation: {s.result.metrics?.computation_ms==null?'N/A':`${s.result.metrics.computation_ms} ms`}. <button type="button" className="secondary" onClick={()=>setPreview({...s.result,id:s.id,booked:s.status==='confirmed'})}>{s.status==='draft'?'Review saved draft':'Review saved results'}</button></li>)}</ul></details>
     </div>}
   </section>
 }

@@ -25,12 +25,19 @@ export async function request(path, options = {}) {
     throw new Error(`The server returned an unreadable response (HTTP ${response.status}).`)
   }
   if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new Event('session-expired'))
-    const error = new Error(typeof body.detail === 'string' ? body.detail : 'Please correct the highlighted fields.')
-    error.validationMessages = Array.isArray(body.detail)
-      ? body.detail.map((item) => `${item.loc.filter((part) => part !== 'body').join(' > ')}: ${item.msg}`) : []
-    error.fields = Array.isArray(body.detail)
-      ? Object.fromEntries(body.detail.map((item) => [item.loc.at(-1), item.msg])) : {}
+    const detail = body?.detail
+    const fallback = {401:'Your session expired. Sign in again.',403:'You do not have permission for this action. Reload if your account has changed.',409:'The record changed or conflicts with existing work. Refresh before retrying.',422:'Please correct the form inputs.',429:'Too many requests. Please wait and retry.',503:'The service is temporarily unavailable. Please retry shortly.'}
+    const message = typeof detail === 'string' ? detail : fallback[response.status] || `The request failed (HTTP ${response.status}). Please retry or contact the administrator.`
+    if (response.status === 401 && !['/api/auth/login','/api/auth/activate','/api/auth/me'].includes(path)) {
+      csrfToken = ''
+      window.dispatchEvent(new CustomEvent('session-expired', {detail: message}))
+    }
+    const error = new Error(message)
+    error.status = response.status
+    error.validationMessages = Array.isArray(detail)
+      ? detail.map((item) => `${(item.loc || []).filter((part) => part !== 'body').join(' > ')}: ${item.msg}`) : []
+    error.fields = Array.isArray(detail)
+      ? Object.fromEntries(detail.map((item) => [(item.loc || []).at(-1), item.msg])) : {}
     throw error
   }
   return body

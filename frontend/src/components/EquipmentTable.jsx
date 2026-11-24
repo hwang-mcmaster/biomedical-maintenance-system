@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { request, API_URL } from '../api'
 import { inventoryFields, displayValue } from '../equipmentFields'
 
-export default function EquipmentTable({ devices, loading, error, onRefresh, onDetails, onEdit, onDeleted, readOnly = false }) {
+export default function EquipmentTable({ devices, loading, error, onRefresh, onDetails, onEdit, onDeleted, readOnly = false, emptyMessage = 'No equipment found. Add your first item above.' }) {
   const [confirmId, setConfirmId] = useState(null)
   const [deleting, setDeleting] = useState(null)
   const [deleteError, setDeleteError] = useState('')
@@ -29,7 +29,7 @@ export default function EquipmentTable({ devices, loading, error, onRefresh, onD
       <div role="status" aria-live="polite">
         {loading && <p>Loading equipment…</p>}
         {error && <p className="error">Unable to refresh equipment. {error} Any displayed rows are from the last successful load.</p>}
-        {!loading && !error && devices.length === 0 && <p>No equipment found. Add your first item above.</p>}
+        {!loading && !error && devices.length === 0 && <p>{emptyMessage}</p>}
       </div>
       {deleteError && <p role="alert" className="error">{deleteError}</p>}
       {devices.length > 0 && <div className="table-wrapper"><table>

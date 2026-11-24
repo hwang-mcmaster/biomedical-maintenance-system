@@ -1,0 +1,9 @@
+inventory,batch_offset,strategy,scheduled,unassigned,high_within_target,utilization_percent,service_late,conflicts,mean_engine_ms
+50,0,risk,36,14,7,95.0,9,0,0.842
+50,0,fixed_interval,39,11,6,86.43,13,0,0.85
+100,0,risk,41,59,15,95.0,10,0,1.582
+100,0,fixed_interval,49,51,4,88.57,25,0,1.683
+200,0,risk,41,59,15,95.0,10,0,1.637
+200,0,fixed_interval,49,51,4,88.57,25,0,1.771
+200,100,risk,39,61,15,94.29,8,0,1.644
+200,100,fixed_interval,49,51,4,88.57,25,0,1.755

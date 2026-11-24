@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-11-19T16:16:25.683Z",
+  "scope": "Real React rendered in JSDOM; real HTTP, session/CSRF, PostgreSQL and local AI. Layout verified separately.",
+  "passed": true,
+  "flow": [
+    "login",
+    "React equipment creation",
+    "PostgreSQL retrieval",
+    "AI assessment",
+    "recommendation/task priority",
+    "technician availability",
+    "baseline comparison",
+    "confirmation",
+    "reload"
+  ],
+  "model_version": "58b2953106b05903",
+  "sample_recommendation": "Prioritize an engineering review of repeated repairs and lifecycle costs before making maintenance or replacement decisions.",
+  "risk_level": "high",
+  "repair_rate_percentile": 1,
+  "request_timings_ms": {
+    "/api/auth/login": 301,
+    "/api/equipment": 505,
+    "/api/equipment/da7c58e2-d093-45d5-9d76-6d41ffd47e82/assessment": 310,
+    "/api/workflow/tasks": 732,
+    "/api/workflow/technicians": 625,
+    "/api/workflow/schedules/preview": 609,
+    "/api/workflow/schedules/1f4fb3a6-d077-4312-911d-7589837f8f2b/confirm": 742
+  },
+  "schedule": {
+    "metrics": {
+      "tasks_requested": 1,
+      "scheduled_count": 1,
+      "unscheduled_count": 0,
+      "conflicts": 0,
+      "validation": {
+        "passed": true,
+        "conflicts": 0,
+        "issues": [],
+        "checks": [
+          "task coverage",
+          "task identity",
+          "duration",
+          "qualifications",
+          "availability",
+          "technician conflicts",
+          "equipment conflicts",
+          "existing bookings"
+        ]
+      },
+      "high_priority_requested": 1,
+      "high_priority_scheduled_within_target": 1,
+      "after_target_count": 0,
+      "service_interval_tasks": 0,
+      "service_interval_scheduled_on_time": 0,
+      "service_interval_scheduled_late": 0,
+      "planned_work_minutes": 60,
+      "planned_equipment_downtime_minutes": 60,
+      "selected_task_utilization_percent": 12.5,
+      "technicians": [
+        {
+          "technician_id": "65196bee-b069-4d0d-8310-8c7af6dd623f",
+          "name": "UI-VALIDATE-ab39719fa27b45f6a3597d02fa3e9f40",
+          "available_minutes": 480,
+          "assigned_minutes": 60,
+          "utilization_percent": 12.5
+        }
+      ],
+      "engine_ms": 0.173,
+      "computation_ms": 89.05
+    },
+    "comparison": {
+      "baseline_name": "Due-date order (incomplete service intervals)",
+      "same_inputs": true,
+      "service_interval_coverage": "0/1",
+      "scope": "Single-day placement on identical tasks, availability, durations and bookings. Missing service intervals use review targets; this is not a full recurring-maintenance policy evaluation.",
+      "baseline": {
+        "schedule_date": "2026-11-20",
+        "timezone": "America/Toronto",
+        "algorithm": "Fixed-interval due date first, then earliest feasible slot; no risk ordering.",
+        "persisted": false,
+        "generated_at": "2026-11-19T16:16:23.540893Z",
+        "assignments": [
+          {
+            "task_id": "3ded466c-e56d-4d50-9634-fef332ce16d5",
+            "title": "UI-VALIDATE-ab39719fa27b45f6a3597d02fa3e9f40",
+            "equipment_id": "da7c58e2-d093-45d5-9d76-6d41ffd47e82",
+            "asset_tag": "UI-VALIDATE-ab39719fa27b45f6a3597d02fa3e9f40",
+            "technician_id": "65196bee-b069-4d0d-8310-8c7af6dd623f",
+            "technician_name": "UI-VALIDATE-ab39719fa27b45f6a3597d02fa3e9f40",
+            "priority": "High",
+            "required_qualification": "ui-ab39719fa27b45f6a3597d02fa3e9f40",
+            "duration_minutes": 60,
+            "start": "2026-11-20T09:00:00-05:00",
+            "end": "2026-11-20T10:00:00-05:00"
+          }
+        ],
+        "unscheduled": [],
+        "notices": [
+          "Preview only. Tasks, technicians, qualifications, availability and bookings are supplied inputs; this plan is not saved or booked.",
+          "Priority-first placement produces a feasible draft, not a globally optimized schedule. Some unassigned tasks may fit under a different ordering.",
+          "Equipment identity comes from PostgreSQL. Task priority is entered explicitly and is not a clinical risk score."
+        ],
+        "metrics": {
+          "tasks_requested": 1,
+          "scheduled_count": 1,
+          "unscheduled_count": 0,
+          "conflicts": 0,
+          "validation": {
+            "passed": true,
+            "conflicts": 0,
+            "issues": [],
+            "checks": [
+              "task coverage",
+              "task identity",
+              "duration",
+              "qualifications",
+              "availability",
+              "technician conflicts",
+              "equipment conflicts",
+              "existing bookings"
+            ]
+          },
+          "high_priority_requested": 1,
+          "high_priority_scheduled_within_target": 1,
+          "after_target_count": 0,
+          "service_interval_tasks": 0,
+          "service_interval_scheduled_on_time": 0,
+          "service_interval_scheduled_late": 0,
+          "planned_work_minutes": 60,
+          "planned_equipment_downtime_minutes": 60,
+          "selected_task_utilization_percent": 12.5,
+          "technicians": [
+            {
+              "technician_id": "65196bee-b069-4d0d-8310-8c7af6dd623f",
+              "name": "UI-VALIDATE-ab39719fa27b45f6a3597d02fa3e9f40",
+              "available_minutes": 480,
+              "assigned_minutes": 60,
+              "utilization_percent": 12.5
+            }
+          ],
+          "engine_ms": 0.064
+        }
+      }
+    }
+  },
+  "screenshots": "See the separate demo guide; JSDOM does not capture screenshots.",
+  "fixture_cleanup": true
+}

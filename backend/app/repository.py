@@ -2,7 +2,7 @@
 from .database import get_connection
 
 FIELD_COLUMNS = {
-    'asset_tag': 'asset_tag', 'serial_number': 'serial_number', 'manufacturer': 'manufacturer',
+    'criticality': 'criticality', 'asset_tag': 'asset_tag', 'serial_number': 'serial_number', 'manufacturer': 'manufacturer',
     'in_service_date': 'in_service_date', 'repair_events': 'repair_events',
     'total_historical_cost': 'total_historical_cost', 'model_number': 'model_number',
     'model_name': 'model_name', 'device_type': 'device_type', 'firmware_version': 'firmware_version',

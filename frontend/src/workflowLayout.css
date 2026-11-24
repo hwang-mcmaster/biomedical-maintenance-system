@@ -132,3 +132,9 @@
     flex-direction: column;
   }
 }
+.service-shell .planning-task-picker { margin: 20px 0; }
+.service-shell .planning-task-list { display: grid; gap: 12px; max-height: 300px; overflow: auto; padding: 12px 2px; }
+.service-shell .planning-task-list label { flex-direction: row; align-items: center; }
+.service-shell .schedule-measurements { margin: 24px 0; padding-top: 20px; border-top: 1px solid #dce5e8; }
+.service-shell .schedule-measurements th[scope="row"] { font-weight: 500; }
+.session-notice { margin: 24px auto; max-width: 600px; padding: 16px; }

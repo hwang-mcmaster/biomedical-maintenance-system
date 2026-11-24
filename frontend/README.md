@@ -25,6 +25,9 @@ times use Toronto time. The result is a draft and is not saved or booked. Equipm
 comes from PostgreSQL; task/staff data is explicitly entered or labelled as demo.
 No personnel credentials or clinical priority are inferred from the AI result.
 
-npm.cmd test builds and runs both equipment/assessment and scheduling UI tests.
-The live test also verifies the schedule against real saved equipment.
-See backend/SCHEDULING.md in the repository for the endpoint and constraint details.
+npm.cmd test builds and checks the authenticated workspace, role-aware pages,
+read-only preview, 200-record inventory, explicit task batching and error states.
+npm.cmd run test:live runs the current authenticated React → PostgreSQL → AI →
+saved task → technician → schedule → reload flow using temporary fixtures.
+Start the backend and AI service first. See backend/VALIDATION.md for setup,
+measured results, cleanup scope, the baseline comparison and the demo scenario.

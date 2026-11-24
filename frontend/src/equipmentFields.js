@@ -11,6 +11,7 @@ export const equipmentFields = [
   { key: 'department', label: 'Department', type: 'text', maxLength: 100, optional: true, group: 'Location and status' },
   { key: 'department_code', label: 'Department code', type: 'text', maxLength: 30, optional: true, group: 'Location and status' },
   { key: 'location', label: 'Physical location / room', type: 'text', maxLength: 200, optional: true, group: 'Location and status' },
+  { key: 'criticality', label: 'Equipment criticality', type: 'select', optionsKey: 'criticalities', optional: true, group: 'Location and status' },
   { key: 'status', label: 'Status', type: 'select', optionsKey: 'statuses', optional: true, group: 'Location and status' },
   { key: 'in_service_date', label: 'In-Service Date', type: 'date', group: 'Lifecycle costs and reference life' },
   { key: 'age_years', label: 'Age (years)', calculated: true, group: 'Lifecycle costs and reference life' },

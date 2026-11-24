@@ -24,6 +24,14 @@ const tasks=[{id:'preview-task',equipment_id:devices[0].id,asset_tag:devices[0].
  priority_reason:'Sample manual engineering review.',duration_minutes:45,required_qualification:'infusion pump',status:'pending',due_date:day}]
 const assignments=[{...tasks[0],id:'preview-assignment',task_id:tasks[0].id,technician_id:technicians[0].id,technician_name:technicians[0].name,
  starts_at:stamp,ends_at:`${day}T11:00:00-05:00`}]
+// Clearly labelled layout fixtures, never validation evidence or measured results.
+const sampleMetrics={scheduled_count:1,unscheduled_count:0,computation_ms:null,engine_ms:null,conflicts:0,
+ high_priority_requested:1,high_priority_scheduled_within_target:1,after_target_count:0,
+ service_interval_scheduled_on_time:0,service_interval_scheduled_late:0,selected_task_utilization_percent:6.25,planned_work_minutes:60}
+const samplePlan={sample:true,schedule_date:day,assignments:assignments.map(a=>({...a,start:a.starts_at,end:a.ends_at,within_target:true})),
+ unscheduled:[],metrics:sampleMetrics,notices:['Illustrative UI sample. No schedule was generated or booked.'],
+ comparison:{baseline_name:'Illustrative due-date baseline',same_inputs:true,service_interval_coverage:'0/1',
+ scope:'UI SAMPLE ONLY. These illustrative values are not measured validation results.',baseline:{metrics:sampleMetrics}}}
 export async function previewRequest(path,options={}) {
  if(!['GET','HEAD'].includes((options.method||'GET').toUpperCase())) throw new Error('UI preview is read-only. Nothing was sent to the backend or saved.')
  if(path==='/api/auth/me')return {user,csrf_token:'ui-preview-only'}
@@ -40,7 +48,7 @@ export async function previewRequest(path,options={}) {
  if(path==='/api/workflow/technicians')return structuredClone(technicians)
  if(path==='/api/workflow/assignments'||path==='/api/workflow/my-work')return structuredClone(assignments)
  if(path==='/api/workflow/metrics')return {high_priority_completion:{completed:0,completed_within_target:0}}
- if(path==='/api/workflow/schedules')return [{id:'preview-run',schedule_date:day,status:'confirmed',result:{metrics:{scheduled_count:1,computation_ms:1.2}}}]
+ if(path==='/api/workflow/schedules')return [{id:'preview-run',schedule_date:day,status:'confirmed',result:structuredClone(samplePlan)}]
  if(path==='/api/maintenance-schedules')return []
  throw new Error('This endpoint is not available in the sample UI preview.')
 }

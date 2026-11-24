@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from .schemas import Assessment, Prediction
+from .decision_policy import recommendation_policy, POLICY_VERSION
 from .calculations import exact_age, two_places
 
 LIMITATION = ('Prototype trained on synthetic ventilator data. Repair intensity is not failure probability or clinical safety. '
@@ -60,7 +61,9 @@ def assess_equipment(device):
                 f'({low:.3f} to {high:.3f} repairs/year). This estimate is an extrapolation; review model applicability.'
             )
     prediction.warnings = list(dict.fromkeys(prediction.warnings))
+    category, reasons = recommendation_policy(device, prediction)
     return Assessment(
+        recommendation_category=category, recommendation_reasons=reasons, policy_version=POLICY_VERSION,
         equipment_id=device.id, risk_score=prediction.risk_score,
         risk_level=prediction.risk_level, assessed_at=datetime.now(timezone.utc),
         method='AI maintenance-cost model + repair-intensity rules',
